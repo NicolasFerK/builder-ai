@@ -4,14 +4,11 @@ import {
   LayoutDashboard, 
   Plus, 
   Settings, 
-  ChevronRight,
   MoreVertical,
-  Folder,
-  Clock
+  Folder
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/hooks/useProjects';
-import { Project } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,8 +41,6 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
       navigate(`/project/${newProject.id}`);
     }
   };
-
-  const currentProject = projects.find(p => p.id === projectId);
 
   return (
     <aside className="w-64 border-r bg-card flex flex-col h-full">

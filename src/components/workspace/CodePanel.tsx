@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, FileCode, Folder } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileCode } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { FileNode } from '@/types';
@@ -47,20 +47,20 @@ export function CodePanel({ files, onFileSelect, selectedFile }: CodePanelProps)
             {node.type === 'folder' ? (
               <>
                 {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                <Folder className="w-4 h-4 text-blue-500 fill-blue-500/20" />
+                <span className="text-blue-500">📁</span>
               </>
             ) : (
               <>
                 <div className="w-3" /> 
-                <FileCode className="w-4 h-4 text-orange-500" />
+                <span className="text-orange-500">📄</span>
               </>
             )}
             <span className="truncate">{node.name}</span>
-          </div>
+          </div >
           {node.type === 'folder' && isExpanded && node.children && (
-            <div>{renderTree(node.children, depth + 1)}</div>
+            <div >{renderTree(node.children, depth + 1)}</div >
           )}
-        </div>
+        </div >
       );
     });
   };
@@ -70,30 +70,30 @@ export function CodePanel({ files, onFileSelect, selectedFile }: CodePanelProps)
       <div className="w-64 border-r shrink-0 flex flex-col">
         <div className="p-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b">
           Explorer
-        </div>
+        </div >
         <ScrollArea className="flex-1">
           <div className="py-2">
             {renderTree(files)}
-          </div>
+          </div >
         </ScrollArea>
-      </div>
+      </div >
       
       <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
         <div className="p-2 border-b border-white/10 flex items-center justify-between bg-[#252526]">
            <div className="text-xs text-muted-foreground px-2">
              {selectedFile ? selectedFile.name : 'No file selected'}
-           </div>
-        </div>
+           </div >
+        </div >
         <div className="flex-1 overflow-auto p-4 font-mono text-sm">
           <pre className="text-gray-300">
             {selectedFile ? (
-              <code>{selectedFile.content}</code>
+              <code >{selectedFile.content}</code>
             ) : (
               <span className="text-muted-foreground italic">Select a file to view its content...</span>
             )}
           </pre>
-        </div>
-      </div>
-    </div>
+        </div >
+      </div >
+    </div >
   );
 }

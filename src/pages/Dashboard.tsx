@@ -1,9 +1,123 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, FolderOpen, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useProjects } from '@/hooks/useProjects';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+
+type DashboardFormValues = {
+  name: string;
+  description: string;
+};
 
 export default function Dashboard() {
+  const { projects, createProject, isLoading } = useProjects();
+  const navigate = useNavigate();
+  const { register, handleSubmit, reset } = useForm<DashboardFormValues>();
+
+  const onSubmit = (data: DashboardFormValues) => {
+    try {
+      const newProject = createProject(data.name, data.description);
+      toast.success('Project created successfully!');
+      reset();
+      navigate(`/project/${newProject.id}`);
+    } catch (error) {
+      toast.error('Failed to create project.');
+      console.error(error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground">Loading projects...</div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ backgroundColor: 'red', minHeight: '100vh', width: '100vw' }}>
-      <h1 style={{ color: 'black', fontSize: '50px' }}>IF YOU SEE THIS, THE APP IS WORKING!</h1>
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-6xl mx-auto">
+        <header className="flex items-center justify-between mb-12">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">My Projects</h1>
+            <p className="text-muted-foreground mt-2">Manage and continue your AI-generated applications.</p>
+          </div>
+          
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="lg" className="gap-2">
+                <Plus className="w-5 h-5" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Project Name</Label>
+                  <Input id="name" placeholder="e.g., My Awesome App" {...register('name', { required: true })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Initial Description</Label>
+                  <Textarea 
+                    id="description" 
+                    placeholder="Describe what you want to build..." 
+                    className="min-h-[120px]"
+                    {...register('description')} 
+                  />
+                </div>
+                <Button type="submit" className="w-full">Create Project</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </header>
+
+        {projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-xl bg-muted/30">
+            <div className="bg-muted p-4 rounded-full mb-4">
+              <FolderOpen className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold">No projects yet</h2>
+            <p className="text-muted-foreground max-w-xs mx-auto mt-2">
+              Start by creating your first project and let the AI build it for you.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => (
+              <Card 
+                key={project.id} 
+                className="group cursor-pointer hover:border-primary/50 transition-all"
+                onClick={() => navigate(`/project/${project.id}`)}
+              >
+                <CardHeader>
+                  <CardTitle className="group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                  <CardDescription className="line-clamp-2 min-h-[40px]">
+                    {project.description || 'No description provided.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center text-xs text-muted-foreground gap-4">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {new Date(project.lastModified).toLocaleDateString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

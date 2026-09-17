@@ -113,7 +113,7 @@ export function ChatPanel() {
         <p className="text-[10px] text-center text-muted-foreground mt-2">
           AI can make mistakes. Check important info.
         </p>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
