@@ -47,12 +47,12 @@ export function CodePanel({ files, onFileSelect, selectedFile }: CodePanelProps)
             {node.type === 'folder' ? (
               <>
                 {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                <span className="text-blue-500">📁</span>
+                <span className="text-primary">📁</span>
               </>
             ) : (
               <>
                 <div className="w-3" /> 
-                <span className="text-orange-500">📄</span>
+                <span className="text-primary">📄</span>
               </>
             )}
             <span className="truncate">{node.name}</span>
@@ -78,14 +78,14 @@ export function CodePanel({ files, onFileSelect, selectedFile }: CodePanelProps)
         </ScrollArea>
       </div >
       
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
-        <div className="p-2 border-b border-white/10 flex items-center justify-between bg-[#252526]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-background">
+        <div className="p-2 border-b flex items-center justify-between bg-muted/50">
            <div className="text-xs text-muted-foreground px-2">
              {selectedFile ? selectedFile.name : 'No file selected'}
            </div >
         </div >
         <div className="flex-1 overflow-auto p-4 font-mono text-sm">
-          <pre className="text-gray-300">
+          <pre className="text-foreground">
             {selectedFile ? (
               <code >{selectedFile.content}</code>
             ) : (

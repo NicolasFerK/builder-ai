@@ -27,7 +27,7 @@ export default function ProjectWorkspace() {
   };
 
   return (
-    <div className="h-screen w-full flex overflow-hidden">
+    <div className="h-screen w-full flex overflow-hidden bg-background">
       <WorkspaceSidebar />
       
       <main className="flex-1 flex overflow-hidden">
@@ -50,7 +50,7 @@ export default function ProjectWorkspace() {
                 onFileSelect={handleFileSelect}
                 selectedFile={selectedFile}
               />
-            </div >
+            </div>
           </div>
         </div>
       </main>
