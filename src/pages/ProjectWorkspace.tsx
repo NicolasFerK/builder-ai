@@ -6,7 +6,6 @@ import { PreviewPanel } from '@/components/workspace/PreviewPanel';
 import { CodePanel } from '@/components/workspace/CodePanel';
 import { useProjects } from '@/hooks/useProjects';
 import { FileNode } from '@/types';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
@@ -32,37 +31,28 @@ export default function ProjectWorkspace() {
       <WorkspaceSidebar />
       
       <main className="flex-1 flex overflow-hidden">
-        <ResizablePanelGroup direction="horizontal">
+        <div className="flex flex-row w-full h-full">
           {/* Chat Panel */}
-          <ResizablePanel defaultSize={25} minSize={20}>
+          <div className="w-1/4 h-full border-r">
             <ChatPanel />
-          </ResizablePanel>
+          </div>
           
-          <ResizableHandle withHandle />
+          <div className="w-3/4 h-full flex flex-col">
+            {/* Preview Panel */}
+            <div className="h-1/2 border-b">
+              <PreviewPanel />
+            </div>
 
-          {/* Main Content Area: Preview & Code */}
-          <ResizablePanel defaultSize={75}>
-            <ResizablePanelGroup direction="vertical">
-              
-              {/* Preview Panel */}
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <PreviewPanel />
-              </ResizablePanel>
-
-              <ResizableHandle withHandle />
-
-              {/* Code Panel */}
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <CodePanel 
-                  files={currentProject.files} 
-                  onFileSelect={handleFileSelect}
-                  selectedFile={selectedFile}
-                />
-              </ResizablePanel>
-
-            </ResizablePanelGroup>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            {/* Code Panel */}
+            <div className="h-1/2">
+              <CodePanel 
+                files={currentProject.files} 
+                onFileSelect={handleFileSelect}
+                selectedFile={selectedFile}
+              />
+            </div >
+          </div>
+        </div>
       </main>
     </div>
   );
