@@ -1,18 +1,19 @@
-import React from 'react';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Dashboard from "./pages/Dashboard";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-const App = () => {
-  return (
-    <div style={{ 
-      backgroundColor: 'white', 
-      height: '100vh', 
-      width: '100vw', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center' 
-    }}>
-      <h1 style={{ color: 'black', fontSize: '40px' }}>Hello World</h1>
-    </div>
-  );
-};
+const App = () => (
+  <TooltipProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
+    <Toaster />
+    <Sonner />
+  </TooltipProvider>
+);
 
 export default App;
