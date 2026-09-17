@@ -1,8 +1,5 @@
 import React from 'react';
-import Dashboard from "./pages/Dashboard";
-
-console.log("App.tsx executing");
 
 export default function App() {
-  return <Dashboard />;
+  return <div style={{ color: 'red' }}>App Component</div>;
 }
