@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { FileNode } from '@/types';
 
 interface CodePanelProps {
-  files: FileNode[];
+  files: FileNode[] | undefined;
   onFileSelect: (file: FileNode) => void;
   selectedFile: FileNode | null;
 }
@@ -23,7 +23,8 @@ export function CodePanel({ files, onFileSelect, selectedFile }: CodePanelProps)
     setExpandedFolders(newExpanded);
   };
 
-  const renderTree = (nodes: FileNode[], depth = 0) => {
+  const renderTree = (nodes: FileNode[] | undefined, depth = 0) => {
+    if (!nodes) return null;
     return nodes.map((node) => {
       const isExpanded = expandedFolders.has(node.id);
       const isSelected = selectedFile?.id === node.id;
