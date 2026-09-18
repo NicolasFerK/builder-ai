@@ -22,3 +22,9 @@ export type FileNode = {
   content?: string;
   children?: FileNode[];
 };
+
+export type AISettings = {
+  apiUrl: string;
+  apiKey?: string;
+  modelName?: string;
+};

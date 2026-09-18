@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, Clock } from 'lucide-react';
+import { Plus, FolderOpen, Clock, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useProjects } from '@/hooks/useProjects';
@@ -50,35 +50,41 @@ export default function Dashboard() {
             <p className="text-muted-foreground mt-2">Manage and continue your AI-generated applications.</p>
           </div>
           
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
-                <Plus className="w-5 h-5" />
-                New Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Project Name</Label>
-                  <Input id="name" placeholder="e.g., My Awesome App" {...register('name', { required: true })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Initial Description</Label>
-                  <Textarea 
-                    id="description" 
-                    placeholder="Describe what you want to build..." 
-                    className="min-h-[120px]"
-                    {...register('description')} 
-                  />
-                </div>
-                <Button type="submit" className="w-full">Create Project</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="lg" className="gap-2" onClick={() => navigate('/settings')}>
+              <SettingsIcon className="w-5 h-5" />
+              Settings
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="lg" className="gap-2">
+                  <Plus className="w-5 h-5" />
+                  New Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Project</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Project Name</Label>
+                    <Input id="name" placeholder="e.g., My Awesome App" {...register('name', { required: true })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Initial Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Describe what you want to build..."
+                      className="min-h-[120px]"
+                      {...register('description')}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Create Project</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
 
         {projects.length === 0 ? (
