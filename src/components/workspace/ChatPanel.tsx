@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,11 +8,14 @@ import { ChatMessage } from '@/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useParams } from 'react-router-dom';
 import { useSettings } from '@/hooks/useSettings';
+import { parseCodeBlocks, updateFileInTree } from '@/utils/codeParser';
+import { useToast } from '@/hooks/use-toast';
 
 export function ChatPanel() {
   const { projectId } = useParams();
   const { projects, updateProject } = useProjects();
   const { settings } = useSettings();
+  const { toast } = useToast();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -27,6 +30,42 @@ export function ChatPanel() {
       }
     }
   }, [currentProject?.chatHistory, isTyping]);
+
+  const handleApplyCode = async (content: string) => {
+    if (!currentProject) return;
+
+    const blocks = parseCodeBlocks(content);
+    if (blocks.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No code detected',
+        description: 'Could not find any code blocks to apply.',
+      });
+      return;
+    }
+
+    try {
+      let updatedFiles = [...currentProject.files];
+      
+      for (const block of blocks) {
+        updatedFiles = updateFileInTree(updatedFiles, block.path, block.content);
+      }
+
+      updateProject(currentProject.id, { files: updatedFiles });
+      
+      toast({
+        title: 'Code applied successfully!',
+        description: `Updated ${blocks.length} file(s) in your project.`,
+      });
+    } catch (error) {
+      console.error('Failed to apply code:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error applying code',
+        description: 'An error occurred while updating the project files.',
+      });
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!input.trim() || !currentProject) return;
@@ -45,7 +84,6 @@ export function ChatPanel() {
     setIsTyping(true);
 
     if (!settings.apiUrl) {
-      // Fallback to simulation if no API is configured
       setTimeout(() => {
         const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
@@ -75,19 +113,11 @@ export function ChatPanel() {
       });
 
       if (!response.ok) {
-        let errorDetail = response.statusText;
-        try {
-          const errorData = await response.json();
-          errorDetail = errorData.error?.message || errorData.message || errorData.error || JSON.stringify(errorData);
-        } catch (e) {
-          // fallback to statusText
-        }
-        throw new Error(`API error (${response.status}): ${errorDetail}`);
+        throw new Error(`API error: ${response.statusText}`);
       }
 
       const data = await response.json();
       
-      // Handle different response formats (OpenAI style vs others)
       let aiContent = '';
       if (data.choices && data.choices[0] && data.choices[0].message) {
         aiContent = data.choices[0].message.content;
@@ -159,6 +189,20 @@ export function ChatPanel() {
                 <span className="text-[10px] text-muted-foreground mt-1 px-1">
                   {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                
+                {message.role === 'assistant' && parseCodeBlocks(message.content).length > 0 && (
+                  <div className="mt-2 flex justify-start">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2 h-8 text-xs"
+                      onClick={() => handleApplyCode(message.content)}
+                    >
+                      <Play className="w-3 h-3" />
+                      Apply Code to Files
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
