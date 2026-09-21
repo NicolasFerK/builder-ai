@@ -75,7 +75,14 @@ export function ChatPanel() {
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        let errorDetail = response.statusText;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error?.message || errorData.message || errorData.error || JSON.stringify(errorData);
+        } catch (e) {
+          // fallback to statusText
+        }
+        throw new Error(`API error (${response.status}): ${errorDetail}`);
       }
 
       const data = await response.json();
