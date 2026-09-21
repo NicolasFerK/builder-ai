@@ -30,36 +30,50 @@ export function PreviewPanel({ project }: PreviewPanelProps) {
   const srcDoc = indexHtmlFile?.content || '';
 
   return (
-    <div className=\"flex flex-col h-full bg-muted/30\">
-      <div className=\"p-2 border-b flex items-center justify-between bg-background\">
-        <div className=\"flex items-center gap-2\">
-          <span className=\"text-xs font-medium text-muted-foreground px-2\">Preview</span>
+    <div className='flex flex-col h-full bg-muted/30'>
+      <div className='p-2 border-b flex items-center justify-between bg-background'>
+        <div className='flex items-center gap-2'>
+          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
         </div>
-        <div className=\"flex items-center gap-1 bg-muted p-1 rounded-lg\">
-          <Button variant=\"ghost\" size=\"icon\" className=\"h-7 w-7\">
-            <Monitor className=\"w-4 h-4\" />
+        <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
+          <Button variant='ghost' size='icon' className='h-7 w-7'>
+            <Monitor className='w-4 h-4' />
           </Button>
-          <Button variant=\"ghost\" size=\"icon\" className=\"h-7 w-7\">
-            <Smartphone className=\"w-4 h-4\" />
+          <Button variant='ghost' size='icon' className='h-7 w-7'>
+            <Smartphone className='w-4 h-4' />
           </Button>
         </div>
       </div>
       
-      <div className=\"flex-1 flex items-center justify-center p-4 bg-slate-100\">
+      <div className='flex-1 flex items-center justify-center p-4 bg-slate-100'>
         {indexHtmlFile ? (
-          <div className=\"w-full h-full max-w-5xl shadow-2xl rounded-lg overflow-hidden bg-white\">
+          <div className='w-full h-full max-w-5xl shadow-2xl rounded-lg overflow-hidden bg-white'>
             <iframe
               srcDoc={srcDoc}
-              title=\"Project Preview\"
-              className=\"w-full h-full border-none\"
-              sandbox=\"allow-scripts allow-modals allow-forms allow-popups allow-same-origin\"\n            />
+              title='Project Preview'
+              className='w-full h-full border-none'
+              sandbox='allow-scripts allow-modals allow-forms allow-popups allow-same-origin'
+            />
           </div>
         ) : (
-          <div className=\"max-w-md w-full text-center space-y-4 p-8 bg-background rounded-xl shadow-sm border\">
-            <div className=\"w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto text-muted-foreground\">\n              <AlertCircle className=\"w-8 h-8\" />\n            </div>
-            <div className=\"space-y-2\">\n              <h3 className=\"text-xl font-semibold\">No index.html found</h3>\n              <p className=\"text-sm text-muted-foreground\">\n                To see a preview, make sure your project has an 'index.html' file at the root or in the 'src' folder.\n              </p>\n            </div>
-            <div className=\"pt-4\">\n              <p className=\"text-xs text-muted-foreground italic\">\n                Tip: Ask the AI to \"Create an index.html file for me\".\n              </p>\n            </div>
+          <div className='max-w-md w-full text-center space-y-4 p-8 bg-background rounded-xl shadow-sm border'>
+            <div className='w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto text-muted-foreground'>
+              <AlertCircle className='w-8 h-8' />
+            </div>
+            <div className='space-y-2'>
+              <h3 className='text-xl font-semibold'>No index.html found</h3>
+              <p className='text-sm text-muted-foreground'>
+                To see a preview, make sure your project has an 'index.html' file at the root or in the 'src' folder.
+              </p>
+            </div>
+            <div className='pt-4'>
+              <p className='text-xs text-muted-foreground italic'>
+                Tip: Ask the AI to 'Create an index.html file for me'.
+              </p>
+            </div>
           </div>
         )}
       </div>
-    </div>\n  );\n}\n
+    </div>
+  );
+}
