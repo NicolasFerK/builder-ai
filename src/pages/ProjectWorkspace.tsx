@@ -18,8 +18,8 @@ export default function ProjectWorkspace() {
   if (!currentProject) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Project not found.</div >
-      </div >
+        <div className="text-muted-foreground">Project not found.</div>
+      </div>
     );
   }
 
@@ -35,36 +35,36 @@ export default function ProjectWorkspace() {
         {/* Left: Chat Panel */}
         <div className="w-80 border-r shrink-0 flex flex-col">
           <ChatPanel />
-        </div >
+        </div>
         
         {/* Right: Workspace Area (Tabs for Code/Preview) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Tabs defaultValue="preview" className="flex flex-col w-full h-full">
-            <div className="flex items-center justify-between px-4 border-b h-12 bg-muted/30 shrink-0">
-              <TabsList className="bg-transparent h-full w-auto p-0 gap-2">
+          <Tabs defaultValue=\"preview\" className=\"flex flex-col w-full h-full\">
+            <div className=\"flex items-center justify-between px-4 border-b h-12 bg-muted/30 shrink-0\">
+              <TabsList className=\"bg-transparent h-full w-auto p-0 gap-2\">
                 <TabsTrigger 
-                  value="preview" 
-                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  value=\"preview\" 
+                  className=\"data-[state=active]:bg-background data-[state=active]:shadow-sm\"
                 >
                   Preview
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="code" 
-                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  value=\"code\" 
+                  className=\"data-[state=active]:bg-background data-[state=active]:shadow-sm\"
                 >
                   Code
                 </TabsTrigger>
               </TabsList>
-              <div className="text-xs text-muted-foreground">
+              <div className=\"text-xs text-muted-foreground\">
                 {currentProject.name}
               </div>
             </div>
 
-            <TabsContent value="preview" className="flex-1 m-0 overflow-hidden">
-              <PreviewPanel />
+            <TabsContent value=\"preview\" className=\"flex-1 m-0 overflow-hidden\">
+              <PreviewPanel project={currentProject} />
             </TabsContent>
             
-            <TabsContent value="code" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value=\"code\" className=\"flex-1 m-0 overflow-hidden\">
               <CodePanel 
                 files={currentProject.files || []} 
                 onFileSelect={handleFileSelect}
