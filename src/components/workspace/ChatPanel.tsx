@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ChatMessage } from '@/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useParams } from 'react-router-dom';
-import { useSettings } from '@/hooks/useSettings';
+import { useSettings } from '@/context/SettingsContext';
 import { parseCodeBlocks, updateFileInTree } from '@/utils/codeParser';
 import { useToast } from '@/hooks/use-toast';
 

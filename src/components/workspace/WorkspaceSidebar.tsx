@@ -8,7 +8,9 @@ import {
   Folder,
   FileCode,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/hooks/useProjects';
@@ -20,6 +22,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { FileNode } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useSettings } from '@/context/SettingsContext';
 
 type NewProjectForm = {
   name: string;
@@ -36,6 +39,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
   const navigate = useNavigate();
   const { register, handleSubmit, reset } = useForm<NewProjectForm>();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root']));
+  const { settings, updateSettings } = useSettings();
 
   const activeProject = getProject(projectId || '');
 
@@ -58,6 +62,10 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
     } else {
       navigate(`/project/${newProject.id}`);
     }
+  };
+
+  const toggleTheme = () => {
+    updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
   };
 
   const renderFileTree = (nodes: FileNode[] | undefined, depth = 0) => {
@@ -140,7 +148,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
           <>
             <div className='text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider'>
               Files
-            </div>
+            </div >
             <ScrollArea className='h-64 border-b mb-4'>
                <div className='py-2'>
                  {renderFileTree(activeProject.files)}
@@ -182,10 +190,21 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
           <LayoutDashboard className='w-4 h-4' />
           Dashboard
         </Button>
-        <Button variant='ghost' className='w-full justify-start gap-2 text-muted-foreground'>
+        <Button variant='ghost' className='w-full justify-start gap-2 text-muted-foreground' onClick={() => navigate('/settings')}>
           <Settings className='w-4 h-4' />
           Settings
         </Button>
+
+        <div className='pt-2 mt-2 border-t border-border'>
+          <Button 
+            variant='ghost' 
+            className='w-full justify-start gap-2 text-muted-foreground'
+            onClick={toggleTheme}
+          >
+            {settings.theme === 'light' ? <Moon className='w-4 h-4' /> : <Sun className='w-4 h-4' />}
+            {settings.theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </Button>
+        </div>
       </div>
     </aside>
   );

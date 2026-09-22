@@ -1,11 +1,12 @@
 import React from 'react';
-import { useSettings } from '@/hooks/useSettings';
+import { useSettings } from '@/context/SettingsContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, RefreshCcw, Save } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun } from 'lucide-react';
 
 const SettingsPage = () => {
   const { settings, updateSettings, resetSettings } = useSettings();
@@ -27,12 +28,36 @@ const SettingsPage = () => {
     });
   };
 
+  const toggleTheme = () => {
+    updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
+  };
+
   return (
     <div className="container mx-auto py-10 px-4 max-w-2xl">
       <div className="flex items-center gap-3 mb-8">
         <SettingsIcon className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold">AI Configuration</h1>
+        <h1 className="text-3xl font-bold">Settings</h1>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>
+            Customize how BuilderAI looks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {settings.theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <Label htmlFor="theme-mode">Dark Mode</Label>
+          </div>
+          <Switch
+            id="theme-mode"
+            checked={settings.theme === 'dark'}
+            onCheckedChange={toggleTheme}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

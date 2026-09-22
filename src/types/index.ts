@@ -27,4 +27,5 @@ export type AISettings = {
   apiUrl: string;
   apiKey?: string;
   modelName?: string;
+  theme?: 'light' | 'dark';
 };
