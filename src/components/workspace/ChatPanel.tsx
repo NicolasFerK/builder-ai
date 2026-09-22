@@ -66,7 +66,8 @@ export function ChatPanel() {
       
       toast({
         title: 'Code applied successfully!',
-        description: `Updated ${blocks.length} file(s) in your project.`,\n      });
+        description: `Updated ${blocks.length} file(s) in your project.`,
+      });
     } catch (error) {
       console.error('Failed to apply code:', error);
       toast({
