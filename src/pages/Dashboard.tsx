@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen, Clock, Settings as SettingsIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useProjects } from '@/hooks/useProjects';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { Project } from '@/types';
 
 type DashboardFormValues = {
   name: string;
@@ -19,6 +20,7 @@ type DashboardFormValues = {
 
 export default function Dashboard() {
   const { projects, createProject, deleteProject, isLoading } = useProjects();
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const { register, handleSubmit, reset } = useForm<DashboardFormValues>();
 
@@ -112,62 +114,72 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
               <div key={project.id} className="relative group">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Card 
-                      className="cursor-pointer hover:border-primary/50 transition-all h-full"
-                      onClick={() => navigate(`/project/${project.id}`)}
-                    >
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="group-hover:text-primary transition-colors">{project.name}</CardTitle>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <CardDescription className="line-clamp-2 min-h-[40px] mt-2">
-                          {project.description || 'No description provided.'}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center text-xs text-muted-foreground gap-4">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(project.lastModified).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete "{project.name}" and all its data. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => handleDelete(project.id)}
+                <Card 
+                  className="cursor-pointer hover:border-primary/50 transition-all h-full"
+                  onClick={() => navigate(`/project/${project.id}`)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectToDelete(project);
+                        }}
                       >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <CardDescription className="line-clamp-2 min-h-[40px] mt-2">
+                      {project.description || 'No description provided.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center text-xs text-muted-foreground gap-4">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(project.lastModified).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             ))}
           </div>
         )}
+
+        <AlertDialog 
+          open={!!projectToDelete} 
+          onOpenChange={(open) => {
+            if (!open) setProjectToDelete(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete "{projectToDelete?.name}" and all its data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (projectToDelete) {
+                    handleDelete(projectToDelete.id);
+                    setProjectToDelete(null);
+                  }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
