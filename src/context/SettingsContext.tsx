@@ -25,13 +25,14 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
           apiKey: parsed.apiKey,
           modelName: parsed.modelName,
           theme: parsed.theme || 'light',
+          viewMode: parsed.viewMode || 'desktop',
         };
       } catch (e) {
         console.error('Failed to parse settings', e);
-        return { apiUrl: '', theme: 'light' };
+        return { apiUrl: '', theme: 'light', viewMode: 'desktop' };
       }
     }
-    return { apiUrl: '', theme: 'light' };
+    return { apiUrl: '', theme: 'light', viewMode: 'desktop' };
   });
 
   const [isLoaded, setIsLoaded] = useState(false);

@@ -8,10 +8,12 @@ import { useProjects } from '@/hooks/useProjects';
 import { FileNode } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { useSettings } from '@/context/SettingsContext';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
   const { projects } = useProjects();
+  const { settings } = useSettings();
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
 
   const currentProject = projects.find(p => p.id === projectId);
@@ -19,8 +21,8 @@ export default function ProjectWorkspace() {
   if (!currentProject) {
     return (
       <div className='h-screen flex items-center justify-center'>
-        <div className='text-muted-foreground'>Project not found.</div>
-      </div>
+        <div className='text-muted-foreground'>Project not found.</div >
+      </div >
     );
   }
 
@@ -28,12 +30,14 @@ export default function ProjectWorkspace() {
     setSelectedFile(file);
   };
 
+  const isMobileMode = settings.viewMode === 'mobile';
+
   return (
-    <div className='h-screen w-full flex overflow-hidden bg-background'>
+    <div className={`h-screen w-full flex overflow-hidden bg-background ${isMobileMode ? 'max-w-[430px] mx-auto border-x shadow-2xl' : ''}`}>
       <WorkspaceSidebar />
       <div className='flex-1 flex overflow-hidden'>
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={25} minSize={15} className="flex flex-col border-r">
+        <ResizablePanelGroup direction='horizontal' className='flex-1'>
+          <ResizablePanel defaultSize={25} minSize={15} className='flex flex-col border-r'>
             <ChatPanel />
           </ResizablePanel>
           
@@ -59,8 +63,8 @@ export default function ProjectWorkspace() {
                   </TabsList>
                   <div className='text-xs text-muted-foreground'>
                     {currentProject.name}
-                  </div>
-                </div>
+                  </div >
+                </div >
                 <TabsContent value='preview' className='flex-1 m-0 overflow-hidden'>
                   <PreviewPanel project={currentProject} />
                 </TabsContent>
@@ -72,10 +76,10 @@ export default function ProjectWorkspace() {
                   />
                 </TabsContent>
               </Tabs>
-            </div>
+            </div >
           </ResizablePanel>
         </ResizablePanelGroup>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

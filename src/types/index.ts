@@ -28,4 +28,5 @@ export type AISettings = {
   apiKey?: string;
   modelName?: string;
   theme?: 'light' | 'dark';
+  viewMode?: 'desktop' | 'mobile';
 };

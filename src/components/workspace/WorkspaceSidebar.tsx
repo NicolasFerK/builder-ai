@@ -10,7 +10,9 @@ import {
   ChevronRight,
   ChevronDown,
   Moon,
-  Sun
+  Sun,
+  Smartphone,
+  Monitor
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/hooks/useProjects';
@@ -23,6 +25,7 @@ import { toast } from 'sonner';
 import { FileNode } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSettings } from '@/context/SettingsContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type NewProjectForm = {
   name: string;
@@ -40,6 +43,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
   const { register, handleSubmit, reset } = useForm<NewProjectForm>();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root']));
   const { settings, updateSettings } = useSettings();
+  const isMobile = useIsMobile();
 
   const activeProject = getProject(projectId || '');
 
@@ -66,6 +70,10 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
 
   const toggleTheme = () => {
     updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
+  };
+
+  const toggleViewMode = () => {
+    updateSettings({ viewMode: settings.viewMode === 'mobile' ? 'desktop' : 'mobile' });
   };
 
   const renderFileTree = (nodes: FileNode[] | undefined, depth = 0) => {
@@ -95,7 +103,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             <span className='truncate'>{node.name}</span>
           </div >
           {isFolder && isExpanded && node.children && (
-            <div>{renderFileTree(node.children, depth + 1)}</div>
+            <div>{renderFileTree(node.children, depth + 1)}</div >
           )}
         </div >
       );
@@ -103,13 +111,13 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
   };
 
   return (
-    <aside className='w-64 border-r bg-card flex flex-col h-full'>
+    <aside className={`w-64 border-r bg-card flex flex-col h-full ${isMobile ? 'hidden' : 'flex'}`}>
       <div className='p-4 flex items-center gap-2 border-b'>
         <div className='w-8 h-8 bg-primary rounded-lg flex items-center justify-center'>
           <div className='w-4 h-4 bg-primary-foreground rounded-sm' />
-        </div>
-        <span className='font-bold text-lg tracking-tight'>BuilderAI</span>
-      </div>
+        </div >
+        <span className='font-bold text-lg tracking-tight'>BuilderAI</span >
+      </div >
 
       <div className='p-4'>
         <Dialog>
@@ -127,7 +135,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
               <div className='space-y-2'>
                 <Label htmlFor='name'>Project Name</Label>
                 <Input id='name' placeholder='e.g., My Awesome App' {...register('name', { required: true })} />
-              </div>
+              </div >
               <div className='space-y-2'>
                 <Label htmlFor='description'>Initial Description</Label>
                 <Textarea 
@@ -136,12 +144,12 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
                   className='min-h-[100px]'
                   {...register('description')} 
                 />
-              </div>
+              </div >
               <Button type='submit' className='w-full'>Create Project</Button>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </div >
 
       <div className='flex-1 overflow-y-auto px-2'>
         {activeProject ? (
@@ -152,7 +160,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             <ScrollArea className='h-64 border-b mb-4'>
                <div className='py-2'>
                  {renderFileTree(activeProject.files)}
-               </div>
+               </div >
             </ScrollArea>
             <div className='text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-wider'>
               Recent Projects
@@ -177,13 +185,13 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             >
               <div className='flex items-center gap-2 truncate'>
                 <Folder className='w-4 h-4 flex-shrink-0' />
-                <span className='truncate'>{project.name}</span>
-              </div>
+                <span className='truncate'>{project.name}</span >
+              </div >
               <MoreVertical className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' />
             </button>
           ))}
         </nav>
-      </div>
+      </div >
 
       <div className='p-4 border-t space-y-1'>
         <Button variant='ghost' className='w-full justify-start gap-2 text-muted-foreground' onClick={() => navigate('/')}>
@@ -195,7 +203,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
           Settings
         </Button>
 
-        <div className='pt-2 mt-2 border-t border-border'>
+        <div className='pt-2 mt-2 border-t border-border space-y-1'>
           <Button 
             variant='ghost' 
             className='w-full justify-start gap-2 text-muted-foreground'
@@ -204,8 +212,17 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             {settings.theme === 'light' ? <Moon className='w-4 h-4' /> : <Sun className='w-4 h-4' />}
             {settings.theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </Button>
-        </div>
-      </div>
-    </aside>
+
+          <Button 
+            variant='ghost' 
+            className='w-full justify-start gap-2 text-muted-foreground'
+            onClick={toggleViewMode}
+          >
+            {settings.viewMode === 'desktop' ? <Smartphone className='w-4 h-4' /> : <Monitor className='w-4 h-4' />}
+            {settings.viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
+          </Button>
+        </div >
+      </div >
+    </aside >
   );
 }
