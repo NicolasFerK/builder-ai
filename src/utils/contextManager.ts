@@ -17,7 +17,7 @@ export class ContextManager {
    * 6. SYSTEM INSTRUCTIONS (Rules and Source of Truth)
    */
   static buildPrompt(project: Project, options: ContextBuilderOptions = {}) {
-    const { maxHistoryMessages = 10, includeFileContents = true } = options;
+    const { maxHistoryMessages = 20, includeFileContents = true } = options;
 
     let prompt = '';
 
@@ -118,34 +118,7 @@ export class ContextManager {
     const taskTitle = project.currentTask?.title || 'Unknown Task';
     const filesModified = project.currentTask?.files?.join(', ') || 'Unknown';
 
-    return `Please generate a structured session summary for the current task: "${taskTitle}".
-
-Your summary should be divided into two distinct sections to help maintain context for future sessions.
-
----
-
-# SESSION SUMMARY
-
-## 1. SESSION MEMORY (Transient Information)
-*This section is for things specific to this session that might not be relevant forever.*
-- **Objective**: What was the main goal of this specific session?
-- **Changes Made**: List the key changes and modifications.
-- **Files Modified**: ${filesModified}
-- **Current Progress**: What was actually achieved?
-- **Unresolved Issues**: Are there any bugs, half-finished features, or problems encountered?
-- **Next Steps**: What are the immediate next actions for the next session?
-
-## 2. PROJECT MEMORY (Permanent Knowledge)
-*This section is for information that MUST survive between sessions and shape the project's long-term evolution. Only include high-level, foundational information here.*
-- **Architectural Decisions**: Any new patterns, structures, or library choices made.
-- **Core Rules**: Any new coding standards or constraints discovered or established.
-- **Key Functionalities**: Important features that define how the system works.
-- **Project Structure**: Any significant changes to the project layout.
-
----
-
-**IMPORTANT**: Be concise. Avoid re-stating obvious things. Focus on the "WHY" and "HOW" for Project Memory, and the "WHAT" and "NEXT" for Session Memory.
-`;
+    return `Please generate a structured session summary for the current task: "${taskTitle}".\n\nYour summary should be divided into two distinct sections to help maintain context for future sessions.\n\n---\n\n# SESSION SUMMARY\n\n## 1. SESSION MEMORY (Transient Information)\n*This section is for things specific to this session that might not be relevant forever.*\n- **Objective**: What was the main goal of this specific session?\n- **Changes Made**: List the key changes and modifications.\n- **Files Modified**: ${filesModified}\n- **Current Progress**: What was actually achieved?\n- **Unresolved Issues**: Are there any bugs, half-finished features, or problems encountered?\n- **Next Steps**: What are the immediate next actions for the next session?\n\n## 2. PROJECT MEMORY (Permanent Knowledge)\n*This section is for information that MUST survive between sessions and shape the project's long-term evolution. Only include high-level, foundational information here.*\n- **Architectural Decisions**: Any new patterns, structures, or library choices made.\n- **Core Rules**: Any new coding standards or constraints discovered or established.\n- **Key Functionalities**: Important features that define how the system works.\n- **Project Structure**: Any significant changes to the project layout.\n\n---\n\n**IMPORTANT**: Be concise. Avoid re-stating obvious things. Focus on the "WHY" and "HOW" for Project Memory, and the "WHAT" and "NEXT" for Session Memory.\n`;
   }
 
   /**

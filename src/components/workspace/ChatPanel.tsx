@@ -10,7 +10,7 @@ import { useParams } from 'react-router-dom';
 import { useSettings } from '@/context/SettingsContext';
 import { parseCodeBlocks, updateFileInTree } from '@/utils/codeParser';
 import { useToast } from '@/hooks/use-toast';
-import { ContextManager } from '@/utils/contextManager';
+import { ContextManager, ContextBuilderOptions } from '@/utils/contextManager';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,7 +78,11 @@ export function ChatPanel() {
     }
   };
 
-  const handleSendMessage = async (customPrompt?: string, customMessages?: any[]) => {
+  const handleSendMessage = async (
+    customPrompt?: string, 
+    customMessages?: any[], 
+    contextOptions?: ContextBuilderOptions
+  ) => {
     if (!input.trim() && !customPrompt && !customMessages) return;
     if (!currentProject) return;
 
@@ -117,7 +121,7 @@ export function ChatPanel() {
         const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `(Simulated) I've received your request: \"${currentInput || 'Special command'}\". Please configure your real API in Settings to get real responses!`,
+          content: `(Simulated) I've received your request: \\\"${currentInput || 'Special command'}\\\". Please configure your real API in Settings to get real responses!`,
           timestamp: Date.now(),
         };
         updateProject(currentProject.id, { 
@@ -129,7 +133,7 @@ export function ChatPanel() {
     }
 
     try {
-      const { systemContext, messages } = ContextManager.buildPrompt(currentProject);
+      const { systemContext, messages } = ContextManager.buildPrompt(currentProject, contextOptions);
       
       const finalMessages = customMessages 
         ? [{ role: 'system', content: systemContext }, ...customMessages]
@@ -209,7 +213,12 @@ export function ChatPanel() {
         timestamp: Date.now(),
       };
 
-      const summaryResult = await handleSendMessage(undefined, [...currentProject.chatHistory, userSummaryMessage].map(m => ({ role: m.role, content: m.content })));
+      // IMPORTANT: When summarizing, we pass a higher maxHistoryMessages to ensure the AI sees the full context!
+      const summaryResult = await handleSendMessage(
+        undefined, 
+        [...currentProject.chatHistory, userSummaryMessage].map(m => ({ role: m.role, content: m.content })),
+        { maxHistoryMessages: 50 }
+      );
 
       if (typeof summaryResult === 'string') {
         const newSummary: SessionSummary = {
