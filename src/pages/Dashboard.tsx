@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, Clock, Settings as SettingsIcon, Briefcase } from 'lucide-react';
+import { Plus, FolderOpen, Clock, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useProjects } from '@/hooks/useProjects';
@@ -87,26 +87,6 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Quick Starts</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card
-              className="cursor-pointer hover:border-primary transition-all group"
-              onClick={() => navigate('/erp')}
-            >
-              <CardHeader className="flex flex-row items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors">
-                  <Briefcase className="h-6 w-6" />
-                </div>
-                <div>
-                  <CardTitle>ERP Industrial Demo</CardTitle>
-                  <CardDescription>Sistema de controle de estoque e materiais já pronto para testar.</CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-xl bg-muted/30">
             <div className="bg-muted p-4 rounded-full mb-4">
@@ -120,8 +100,8 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Card
-                key={project.id}
+              <Card 
+                key={project.id} 
                 className="group cursor-pointer hover:border-primary/50 transition-all"
                 onClick={() => navigate(`/project/${project.id}`)}
               >
