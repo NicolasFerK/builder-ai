@@ -79,8 +79,8 @@ export function ChatPanel() {
   };
 
   const handleSendMessage = async (
-    customPrompt?: string, 
-    customMessages?: any[], 
+    customPrompt?: string,
+    customMessages?: any[],
     contextOptions?: ContextBuilderOptions
   ) => {
     if (!input.trim() && !customPrompt && !customMessages) return;
@@ -97,6 +97,7 @@ export function ChatPanel() {
 
     let messagesToSend: any[] = [];
     let currentInput = input;
+    let updatedHistory: ChatMessage[] = [...currentProject.chatHistory];
 
     if (customMessages) {
       messagesToSend = customMessages;
@@ -108,7 +109,7 @@ export function ChatPanel() {
         timestamp: Date.now(),
       };
 
-      const updatedHistory = [...currentProject.chatHistory, userMessage];
+      updatedHistory = [...currentProject.chatHistory, userMessage];
       updateProject(currentProject.id, { chatHistory: updatedHistory });
       messagesToSend = updatedHistory.map(m => ({ role: m.role, content: m.content }));
     }
@@ -124,8 +125,8 @@ export function ChatPanel() {
           content: `(Simulated) I've received your request: \\\"${currentInput || 'Special command'}\\\". Please configure your real API in Settings to get real responses!`,
           timestamp: Date.now(),
         };
-        updateProject(currentProject.id, { 
-          chatHistory: [...currentProject.chatHistory, aiMessage] 
+        updateProject(currentProject.id, {
+          chatHistory: [...updatedHistory, aiMessage]
         });
         setIsTyping(false);
       }, 1000);
@@ -133,11 +134,26 @@ export function ChatPanel() {
     }
 
     try {
-      const { systemContext, messages } = ContextManager.buildPrompt(currentProject, contextOptions);
+      // Create a temporary project object with the updated history to ensure ContextManager has the latest messages for the system prompt
+      const projectWithLatestHistory = {
+        ...currentProject,
+        chatHistory: customMessages ? currentProject.chatHistory : updatedHistory
+      };
+
+      const { systemContext } = ContextManager.buildPrompt(projectWithLatestHistory, contextOptions);
       
-      const finalMessages = customMessages 
-        ? [{ role: 'system', content: systemContext }, ...customMessages]
-        : [{ role: 'system', content: systemContext }, ...messages];
+      const finalMessages = [{ role: 'system', content: systemContext }, ...messagesToSend];
+
+      // [BUILDERAI FLOW DEBUG]
+      console.log(`[BUILDERAI FLOW DEBUG]
+USER INPUT: ${currentInput}
+MESSAGES STATE: ${JSON.stringify(messagesToSend)}
+CURRENT TASK: ${currentProject.currentTask?.title || 'None'}
+`);
+
+      console.log(`[BUILDERAI FLOW DEBUG]
+FINAL MODEL INPUT: ${JSON.stringify(finalMessages)}
+`);
 
       const response = await fetch(settings.apiUrl, {
         method: 'POST',
@@ -150,6 +166,10 @@ export function ChatPanel() {
           messages: finalMessages,
         }),
       });
+
+      console.log(`[BUILDERAI FLOW DEBUG]
+MODEL REQUEST: executed
+`);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`);
@@ -173,9 +193,13 @@ export function ChatPanel() {
         timestamp: Date.now(),
       };
 
+      console.log(`[BUILDERAI FLOW DEBUG]
+MODEL RESPONSE: ${aiContent}
+`);
+
       if (!customMessages) {
-        updateProject(currentProject.id, { 
-          chatHistory: [...currentProject.chatHistory, aiMessage] 
+        updateProject(currentProject.id, {
+          chatHistory: [...updatedHistory, aiMessage]
         });
       } else {
         return aiContent;
@@ -188,8 +212,8 @@ export function ChatPanel() {
         content: `Error: ${error instanceof Error ? error.message : 'Failed to communicate with the AI API. Check your settings and CORS configuration.'}`,
         timestamp: Date.now(),
       };
-      updateProject(currentProject.id, { 
-        chatHistory: [...currentProject.chatHistory, errorMessage] 
+      updateProject(currentProject.id, {
+        chatHistory: [...updatedHistory, errorMessage]
       });
     } finally {
       setIsTyping(false);
