@@ -9,6 +9,19 @@ import { FileNode } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useSettings } from '@/context/SettingsContext';
+import { RefreshCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams();
@@ -48,23 +61,46 @@ export default function ProjectWorkspace() {
               <Tabs defaultValue='preview' className='flex flex-col w-full h-full'>
                 <div className='flex items-center justify-between px-4 border-b h-12 bg-muted/30 shrink-0'>
                   <TabsList className='bg-transparent h-full w-auto p-0 gap-2'>
-                    <TabsTrigger 
-                      value='preview' 
+                    <TabsTrigger
+                      value='preview'
                       className='data-[state=active]:bg-background data-[state=active]:shadow-sm'
                     >
                       Preview
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value='code' 
+                    <TabsTrigger
+                      value='code'
                       className='data-[state=active]:bg-background data-[state=active]:shadow-sm'
                     >
                       Code
                     </TabsTrigger>
                   </TabsList>
-                  <div className='text-xs text-muted-foreground'>
-                    {currentProject.name}
-                  </div >
-                </div >
+                  <div className='flex items-center gap-4'>
+                    <div className='text-xs text-muted-foreground'>
+                      {currentProject.name}
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <RefreshCcw className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Reload Site?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to reload the entire application?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => window.location.reload()}>
+                            Reload
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
                 <TabsContent value='preview' className='flex-1 m-0 overflow-hidden'>
                   <PreviewPanel project={currentProject} />
                 </TabsContent>

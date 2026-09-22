@@ -7,6 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const SettingsPage = () => {
   const { settings, updateSettings, resetSettings } = useSettings();
@@ -133,6 +144,39 @@ const SettingsPage = () => {
       <div className="mt-8 text-center text-sm text-muted-foreground">
         Note: These settings are stored locally in your browser.
       </div>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>System</CardTitle>
+          <CardDescription>
+            Reload the application to ensure all changes are applied correctly.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-full gap-2">
+                <RefreshCcw className="w-4 h-4" />
+                Reload Site
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will reload the entire application. Any unsaved changes in the current session might be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => window.location.reload()}>
+                  Reload
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
     </div>
   );
 };
