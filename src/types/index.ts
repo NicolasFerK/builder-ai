@@ -6,6 +6,9 @@ export type Project = {
   lastModified: number;
   chatHistory: ChatMessage[];
   files: FileNode[];
+  aiContext?: string;
+  sessionSummary?: string;
+  currentTask?: CurrentTask;
 };
 
 export type ChatMessage = {
@@ -21,6 +24,16 @@ export type FileNode = {
   type: 'file' | 'folder';
   content?: string;
   children?: FileNode[];
+};
+
+export type CurrentTask = {
+  id: string;
+  title: string;
+  description: string;
+  objective: string;
+  files: string[]; // relevant files
+  constraints: string;
+  status: 'pending' | 'in_progress' | 'completed';
 };
 
 export type AISettings = {
