@@ -2,12 +2,15 @@ import React, { useMemo } from 'react';
 import { Monitor, Smartphone, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Project, FileNode } from '@/types';
+import { useSettings } from '@/context/SettingsContext';
 
 interface PreviewPanelProps {
   project: Project;
 }
 
 export function PreviewPanel({ project }: PreviewPanelProps) {
+  const { settings, updateSettings } = useSettings();
+
   // Find the index.html file in the project
   const indexHtmlFile = useMemo(() => {
     const findFile = (nodes: FileNode[]): FileNode | undefined => {
@@ -36,10 +39,20 @@ export function PreviewPanel({ project }: PreviewPanelProps) {
           <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
         </div>
         <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
-          <Button variant='ghost' size='icon' className='h-7 w-7'>
+          <Button 
+            variant={settings.viewMode === 'desktop' ? 'secondary' : 'ghost'} 
+            size='icon' 
+            className='h-7 w-7'
+            onClick={() => updateSettings({ viewMode: 'desktop' })}
+          >
             <Monitor className='w-4 h-4' />
           </Button>
-          <Button variant='ghost' size='icon' className='h-7 w-7'>
+          <Button 
+            variant={settings.viewMode === 'mobile' ? 'secondary' : 'ghost'} 
+            size='icon' 
+            className='h-7 w-7'
+            onClick={() => updateSettings({ viewMode: 'mobile' })}
+          >
             <Smartphone className='w-4 h-4' />
           </Button>
         </div>
@@ -47,7 +60,11 @@ export function PreviewPanel({ project }: PreviewPanelProps) {
       
       <div className='flex-1 flex items-center justify-center p-4 bg-slate-100'>
         {indexHtmlFile ? (
-          <div className='w-full h-full max-w-5xl shadow-2xl rounded-lg overflow-hidden bg-white'>
+          <div className={`shadow-2xl rounded-lg overflow-hidden bg-white transition-all duration-300 ${
+            settings.viewMode === 'mobile' 
+              ? 'w-[375px] h-[667px]' 
+              : 'w-full h-full max-w-5xl'
+          }`}>
             <iframe
               srcDoc={srcDoc}
               title='Project Preview'
