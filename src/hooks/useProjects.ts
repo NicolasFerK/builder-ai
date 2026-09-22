@@ -42,15 +42,27 @@ export function useProjects() {
       ],
       files: [
         {
+          id: 'index-html',
+          name: 'index.html',
+          type: 'file',
+          content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>New Project</title>\n</head>\n<body>\n  <div id="root"></div>\n  <script type="module" src="/src/main.tsx"></script>\n</body>\n</html>'
+        },
+        {
+          id: 'vite-config',
+          name: 'vite.config.ts',
+          type: 'file',
+          content: 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [react()],\n});'
+        },
+        {
           id: 'root',
           name: 'src',
           type: 'folder',
           children: [
-            { id: 'app-tsx', name: 'App.tsx', type: 'file', content: 'import React from "react";\n\nexport default function App() {\n  return <div>Hello World</div>;\n}' },
+            { id: 'app-tsx', name: 'App.tsx', type: 'file', content: 'import React from "react";\n\nexport default function App() {\n  return <div className="flex items-center justify-center h-screen">Hello World</div>;\n}' },
             { id: 'main-tsx', name: 'main.tsx', type: 'file', content: 'import React from "react";\nimport ReactDOM from "react-dom/client";\nimport App from "./App";\n\nReactDOM.createRoot(document.getElementById("root")!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);' },
           ],
         },
-        { id: 'package-json', name: 'package.json', type: 'file', content: '{\n  "name": "new-project",\n  "version": "1.0.0",\n  "dependencies": {}\n}' },
+        { id: 'package-json', name: 'package.json', type: 'file', content: '{\n  "name": "new-project",\n  "version": "1.0.0",\n  "dependencies": {\n    "react": "^18.2.0",\n    "react-dom": "^18.2.0"\n  },\n  "devDependencies": {\n    "@types/react": "^18.2.0",\n    "@types/react-dom": "^18.2.0",\n    "@vitejs/plugin-react": "^4.0.0",\n    "vite": "^4.0.0"\n  }\n}' },
       ],
     };
 
