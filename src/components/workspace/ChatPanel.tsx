@@ -31,7 +31,7 @@ export function ChatPanel() {
 
   const currentProject = projects.find(p => p.id === projectId);
   const contextUsage = currentProject ? ContextManager.calculateContextUsage(currentProject) : 0;
-  const contextStatus = ContextManager.getContextStatus(contextUsage);
+  const contextStatus = currentProject ? ContextManager.getContextStatus(contextUsage) : { label: 'None', color: 'outline' };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,8 +66,7 @@ export function ChatPanel() {
       
       toast({
         title: 'Code applied successfully!',
-        description: `Updated ${blocks.length} file(s) in your project.`,
-      });
+        description: `Updated ${blocks.length} file(s) in your project.`,\n      });
     } catch (error) {
       console.error('Failed to apply code:', error);
       toast({
@@ -85,6 +84,9 @@ export function ChatPanel() {
   ) => {
     if (!input.trim() && !customPrompt && !customMessages) return;
     if (!currentProject) return;
+
+    // [BUILDERAI DEBUG]
+    console.log(`[BUILDERAI DEBUG]\nUSER MESSAGE RECEIVED: ${input || customPrompt || 'N/A'}\n`);
 
     // Warning for high context
     if (contextUsage > 80 && !customPrompt && !customMessages) {
@@ -122,7 +124,7 @@ export function ChatPanel() {
         const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `(Simulated) I've received your request: \\\"${currentInput || 'Special command'}\\\". Please configure your real API in Settings to get real responses!`,
+          content: `(Simulated) I've received your request: "${currentInput || 'Special command'}". Please configure your real API in Settings to get real responses!`,
           timestamp: Date.now(),
         };
         updateProject(currentProject.id, {
@@ -144,16 +146,14 @@ export function ChatPanel() {
       
       const finalMessages = [{ role: 'system', content: systemContext }, ...messagesToSend];
 
-      // [BUILDERAI FLOW DEBUG]
-      console.log(`[BUILDERAI FLOW DEBUG]
-USER INPUT: ${currentInput}
-MESSAGES STATE: ${JSON.stringify(messagesToSend)}
-CURRENT TASK: ${currentProject.currentTask?.title || 'None'}
-`);
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nFINAL MODEL INPUT: ${JSON.stringify(finalMessages)}\n`);
 
-      console.log(`[BUILDERAI FLOW DEBUG]
-FINAL MODEL INPUT: ${JSON.stringify(finalMessages)}
-`);
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nREQUEST SENT: ${settings.apiUrl}\nBODY: ${JSON.stringify({
+        model: settings.modelName || 'default',
+        messages: finalMessages,
+      })}\n`);
 
       const response = await fetch(settings.apiUrl, {
         method: 'POST',
@@ -167,15 +167,17 @@ FINAL MODEL INPUT: ${JSON.stringify(finalMessages)}
         }),
       });
 
-      console.log(`[BUILDERAI FLOW DEBUG]
-MODEL REQUEST: executed
-`);
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nHTTP STATUS: ${response.status}\n`);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`);
       }
 
       const data = await response.json();
+      
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nRESPONSE RECEIVED: ${JSON.stringify(data)}\n`);
       
       let aiContent = '';
       if (data.choices && data.choices[0] && data.choices[0].message) {
@@ -186,6 +188,9 @@ MODEL REQUEST: executed
         aiContent = JSON.stringify(data);
       }
 
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nPARSED RESPONSE: ${aiContent}\n`);
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -193,9 +198,10 @@ MODEL REQUEST: executed
         timestamp: Date.now(),
       };
 
-      console.log(`[BUILDERAI FLOW DEBUG]
-MODEL RESPONSE: ${aiContent}
-`);
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nASSISTANT MESSAGE OBJECT: ${JSON.stringify(aiMessage)}\n`);
+
+      console.log(`[BUILDERAI FLOW DEBUG]\nMODEL RESPONSE: ${aiContent}\n`);
 
       if (!customMessages) {
         updateProject(currentProject.id, {
@@ -205,6 +211,8 @@ MODEL RESPONSE: ${aiContent}
         return aiContent;
       }
     } catch (error) {
+      // [BUILDERAI DEBUG]
+      console.error('[BUILDERAI DEBUG] EXCEPTION CAUGHT:', error);
       console.error('Chat error:', error);
       const errorMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -212,6 +220,10 @@ MODEL RESPONSE: ${aiContent}
         content: `Error: ${error instanceof Error ? error.message : 'Failed to communicate with the AI API. Check your settings and CORS configuration.'}`,
         timestamp: Date.now(),
       };
+      
+      // [BUILDERAI DEBUG]
+      console.log(`[BUILDERAI DEBUG]\nADDING ERROR MESSAGE TO CHAT: ${errorMessage.content}\n`);
+      
       updateProject(currentProject.id, {
         chatHistory: [...updatedHistory, errorMessage]
       });
@@ -308,44 +320,49 @@ MODEL RESPONSE: ${aiContent}
 
       <ScrollArea className='flex-1' ref={scrollRef}>
         <div className='p-4 space-y-6'>
-          {currentProject.chatHistory.map((message) => (
-            <div 
-              key={message.id} 
-              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-            >
-              <Avatar className='w-8 h-8 border shrink-0'>
-                <AvatarFallback className={message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
-                  {message.role === 'user' ? <User className='w-4 h-4' /> : <Bot className='w-4 h-4' />}
-                </AvatarFallback>
-              </Avatar>
-              <div className={`flex flex-col max-w-[85%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`px-4 py-2 rounded-2xl text-sm ${
-                  message.role === 'user' 
-                    ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                    : 'bg-muted text-foreground rounded-tl-none'
-                }`}>
-                  {message.content}
-                </div>
-                <span className='text-[10px] text-muted-foreground mt-1 px-1'>
-                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                
-                {message.role === 'assistant' && parseCodeBlocks(message.content).length > 0 && (
-                  <div className='mt-2 flex justify-start'>
-                    <Button 
-                      variant='outline' 
-                      size='sm' 
-                      className='gap-2 h-8 text-xs'
-                      onClick={() => handleApplyCode(message.content)}
-                    >
-                      <Play className='w-3 h-3' />
-                      Apply Code to Files
-                    </Button>
+          {currentProject.chatHistory.map((message) => {
+            // [BUILDERAI DEBUG]
+            console.log(`[BUILDERAI DEBUG] RENDERING MESSAGE: ID=${message.id}, ROLE=${message.role}, CONTENT_LENGTH=${message.content.length}`);
+            
+            return (
+              <div 
+                key={message.id} 
+                className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+              >
+                <Avatar className='w-8 h-8 border shrink-0'>
+                  <AvatarFallback className={message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
+                    {message.role === 'user' ? <User className='w-4 h-4' /> : <Bot className='w-4 h-4' />}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`flex flex-col max-w-[85%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`px-4 py-2 rounded-2xl text-sm ${
+                    message.role === 'user' 
+                      ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                      : 'bg-muted text-foreground rounded-tl-none'
+                  }`}>
+                    {message.content}
                   </div>
-                )}
+                  <span className='text-[10px] text-muted-foreground mt-1 px-1'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  
+                  {message.role === 'assistant' && parseCodeBlocks(message.content).length > 0 && (
+                    <div className='mt-2 flex justify-start'>
+                      <Button 
+                        variant='outline' 
+                        size='sm' 
+                        className='gap-2 h-8 text-xs'
+                        onClick={() => handleApplyCode(message.content)}
+                      >
+                        <Play className='w-3 h-3' />
+                        Apply Code to Files
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {isTyping && (
             <div className='flex gap-3'>
               <Avatar className='w-8 h-8 border shrink-0'>
