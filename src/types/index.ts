@@ -1,3 +1,13 @@
+export type SessionSummary = {
+  id: string;
+  timestamp: number;
+  content: string;
+  /**
+   * information that should be promoted to PROJECT MEMORY
+   */
+  permanentKnowledge?: string;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -6,8 +16,9 @@ export type Project = {
   lastModified: number;
   chatHistory: ChatMessage[];
   files: FileNode[];
-  aiContext?: string;
-  sessionSummary?: string;
+  projectMemory?: string;
+  sessionSummaries: SessionSummary[];
+  currentSessionSummary?: SessionSummary;
   currentTask?: CurrentTask;
 };
 

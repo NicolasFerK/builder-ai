@@ -65,7 +65,8 @@ export function useProjects() {
         { id: 'package-json', name: 'package.json', type: 'file', content: '{\n  "name": "new-project",\n  "version": "1.0.0",\n  "dependencies": {\n    "react": "^18.2.0",\n    "react-dom": "^18.2.0"\n  },\n  "devDependencies": {\n    "@types/react": "^18.2.0",\n    "@types/react-dom": "^18.2.0",\n    "@vitejs/plugin-react": "^4.0.0",\n    "vite": "^4.0.0"\n  }\n}' },
       ],
       aiContext: '# Project Context\n\n## Project\n\nName: ',
-      sessionSummary: '',
+      sessionSummaries: [],
+      currentSessionSummary: undefined,
     };
 
     const updatedProjects = [newProject, ...projects];

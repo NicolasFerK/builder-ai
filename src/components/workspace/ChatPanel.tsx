@@ -199,7 +199,9 @@ export function ChatPanel() {
     toast({ title: 'Compressing context...', description: 'The AI is summarizing your session.' });
 
     try {
-      const summaryPrompt = "Summarize this conversation into a structured format including: Objective, Changes Made, Files Modified, Decisions, Problems, and Pending Tasks. Be concise.";
+      const summaryPrompt = await ContextManager.generateSummaryPrompt(currentProject);
+      
+      // We create a special message to trigger the summarization via the AI
       const userSummaryMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -207,17 +209,24 @@ export function ChatPanel() {
         timestamp: Date.now(),
       };
 
-      const summaryResult = await handleSendMessage(summaryPrompt, [...currentProject.chatHistory, userSummaryMessage].map(m => ({ role: m.role, content: m.content })));
+      const summaryResult = await handleSendMessage(undefined, [...currentProject.chatHistory, userSummaryMessage].map(m => ({ role: m.role, content: m.content })));
 
       if (typeof summaryResult === 'string') {
-        updateProject(currentProject.id, { 
-          sessionSummary: summaryResult,
-          chatHistory: [] 
+        const newSummary: SessionSummary = {
+          id: `session-summary-${Date.now()}`,
+          timestamp: Date.now(),
+          content: summaryResult,
+        };
+
+        updateProject(currentProject.id, {
+          sessionSummaries: [...(currentProject.sessionSummaries || []), newSummary],
+          currentSessionSummary: newSummary,
+          chatHistory: []
         });
 
         toast({
           title: 'Context compressed!',
-          description: 'Conversation history has been summarized and cleared.',
+          description: 'Conversation history has been summarized and versioned.',
         });
       }
     } catch (error) {

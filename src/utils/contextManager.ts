@@ -1,35 +1,37 @@
-import { Project, ChatMessage, CurrentTask } from '../types';
+import { Project, SessionSummary, FileNode } from '../types';
 
 export interface ContextBuilderOptions {
   maxHistoryMessages?: number;
+  includeFileContents?: boolean;
 }
 
 export class ContextManager {
   /**
    * Constructs the structured prompt to be sent to the AI.
    * It combines:
-   * 1. System Prompt (implicit in the way we structure this)
-   * 2. Project Context (AI_CONTEXT.md)
-   * 3. Session Summary (previous session)
-   * 4. Task Context (current task)
-   * 5. Recent Conversation History
+   * 1. PROJECT MEMORY (Long-term, architectural)
+   * 2. SESSION MEMORY (Recent session summary)
+   * 3. CURRENT TASK (Current objective and constraints)
+   * 4. RECENT CONVERSATION (Recent chat history)
+   * 5. CURRENT FILE STATE (Content of relevant files)
+   * 6. SYSTEM INSTRUCTIONS (Rules and Source of Truth)
    */
   static buildPrompt(project: Project, options: ContextBuilderOptions = {}) {
-    const { maxHistoryMessages = 10 } = options;
+    const { maxHistoryMessages = 10, includeFileContents = true } = options;
 
     let prompt = '';
 
-    // 1. Project Context
-    if (project.aiContext) {
-      prompt += `### PROJECT CONTEXT\n${project.aiContext}\n\n`;
+    // 1. PROJECT MEMORY
+    if (project.projectMemory) {
+      prompt += `### PROJECT MEMORY\n${project.projectMemory}\n\n`;
     }
 
-    // 2. Session Summary
-    if (project.sessionSummary) {
-      prompt += `### PREVIOUS SESSION SUMMARY\n${project.sessionSummary}\n\n`;
+    // 2. SESSION MEMORY
+    if (project.currentSessionSummary) {
+      prompt += `### SESSION MEMORY\n${project.currentSessionSummary.content}\n\n`;
     }
 
-    // 3. Task Context
+    // 3. CURRENT TASK
     if (project.currentTask) {
       prompt += `### CURRENT TASK\n`;
       prompt += `TITLE: ${project.currentTask.title}\n`;
@@ -42,15 +44,35 @@ export class ContextManager {
       prompt += `\n`;
     }
 
-    // 4. Conversation History (Recent only)
+    // 4. CURRENT FILE STATE
+    if (includeFileContents) {
+      const relevantFiles = this.getRelevantFiles(project);
+      if (relevantFiles.length > 0) {
+        prompt += `### CURRENT FILE STATE\n`;
+        relevantFiles.forEach(file => {
+          prompt += `--- File: ${file.name} ---\n`;
+          prompt += `${file.content || '[No content available]'}\n\n`;
+        });
+      }
+    }
+
+    // 5. RECENT CONVERSATION
     const historyToUse = project.chatHistory.slice(-maxHistoryMessages);
-    
-    // We return the structured prompt part and the messages for the API call
-    // The API expects an array of {role, content} messages.
-    // We can prepend the context as a 'system' message if the API supports it,
-    // or as part of the first user message. 
-    // Since we are building a system-like context, let's assume we can add it as a 'system' message.
-    
+    if (historyToUse.length > 0) {
+      prompt += `### RECENT CONVERSATION\n`;
+      historyToUse.forEach(m => {
+        prompt += `${m.role.toUpperCase()}: ${m.content}\n`;
+      });
+      prompt += `\n`;
+    }
+
+    // 6. SYSTEM INSTRUCTIONS (The Rules)
+    prompt += `### INSTRUCTIONS\n`;
+    prompt += `1. SOURCE OF TRUTH: The current state of the files in the project is the absolute source of truth. If there is any conflict between memories (Project or Session) and the current code, the current code MUST prevail.\n`;
+    prompt += `2. USE CURRENT CONTENT: When performing tasks, always work with the most recent content of the files. Do not rely on code snippets found in the conversation history unless they are explicitly being proposed as changes.\n`;
+    prompt += `3. ARCHITECTURE: Respect the established project architecture and patterns found in PROJECT MEMORY.\n`;
+    prompt += `4. TASK FOCUS: Stay focused on the CURRENT TASK and its objectives.\n`;
+
     return {
       systemContext: prompt,
       messages: historyToUse.map(m => ({ role: m.role, content: m.content }))
@@ -58,47 +80,76 @@ export class ContextManager {
   }
 
   /**
-   * Generates a summary of the current conversation.
-   * In a real implementation, this would call the AI to summarize.
-   * For now, we'll define the structure and a placeholder for the AI call.
+   * Helper to extract relevant file contents.
+   * Prioritizes files mentioned in the current task.
    */
-  static async generateSummary(project: Project): Promise<string> {
-    // This is a placeholder. In a real scenario, you would:
-    // 1. Construct a special prompt: "Summarize the following conversation..."
-    // 2. Call the AI API.
-    // 3. Return the result.
+  private static getRelevantFiles(project: Project): FileNode[] {
+    const relevantFileNames = project.currentTask?.files || [];
     
-    // For this implementation, we'll return a template that the AI can follow
-    // when the user triggers "Compact Context".
-    
-    return `[SUMMARY GENERATION REQUIRED]
-Please summarize the current session following this structure:
+    if (relevantFileNames.length === 0) {
+      // If no task-specific files, return all files that have content
+      return this.flattenFiles(project.files).filter(f => f.content);
+    }
 
-# Current Session Summary
+    // Find the actual FileNodes by name
+    const allFiles = this.flattenFiles(project.files);
+    return allFiles.filter(f => relevantFileNames.includes(f.name) && f.content);
+  }
 
-## Objective
-(What was the main goal of this session?)
+  /**
+   * Flattens the file tree into a single array.
+   */
+  private static flattenFiles(nodes: FileNode[]): FileNode[] {
+    let flat: FileNode[] = [];
+    for (const node of nodes) {
+      flat.push(node);
+      if (node.children) {
+        flat = [...flat, ...this.flattenFiles(node.children)];
+      }
+    }
+    return flat;
+  }
 
-## Changes Made
-* (List key changes)
+  /**
+   * Generates a prompt for the AI to summarize the session.
+   * This template is designed to help the AI distinguish between permanent and transient information.
+   */
+  static async generateSummaryPrompt(project: Project): Promise<string> {
+    const taskTitle = project.currentTask?.title || 'Unknown Task';
+    const filesModified = project.currentTask?.files?.join(', ') || 'Unknown';
 
-## Files Modified
-* (List files)
+    return `Please generate a structured session summary for the current task: "${taskTitle}".
 
-## Decisions
-* (List important architectural or implementation decisions)
+Your summary should be divided into two distinct sections to help maintain context for future sessions.
 
-## Problems & Solutions
-* (List any significant issues encountered and how they were solved)
+---
 
-## Pending Tasks
-* (What needs to be done next?)
+# SESSION SUMMARY
+
+## 1. SESSION MEMORY (Transient Information)
+*This section is for things specific to this session that might not be relevant forever.*
+- **Objective**: What was the main goal of this specific session?
+- **Changes Made**: List the key changes and modifications.
+- **Files Modified**: ${filesModified}
+- **Current Progress**: What was actually achieved?
+- **Unresolved Issues**: Are there any bugs, half-finished features, or problems encountered?
+- **Next Steps**: What are the immediate next actions for the next session?
+
+## 2. PROJECT MEMORY (Permanent Knowledge)
+*This section is for information that MUST survive between sessions and shape the project's long-term evolution. Only include high-level, foundational information here.*
+- **Architectural Decisions**: Any new patterns, structures, or library choices made.
+- **Core Rules**: Any new coding standards or constraints discovered or established.
+- **Key Functionalities**: Important features that define how the system works.
+- **Project Structure**: Any significant changes to the project layout.
+
+---
+
+**IMPORTANT**: Be concise. Avoid re-stating obvious things. Focus on the "WHY" and "HOW" for Project Memory, and the "WHAT" and "NEXT" for Session Memory.
 `;
   }
 
   /**
    * Calculates the approximate context usage percentage.
-   * This is a heuristic based on chat history length.
    */
   static calculateContextUsage(project: Project): number {
     const MAX_MESSAGES = 50;
