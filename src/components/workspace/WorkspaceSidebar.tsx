@@ -10,9 +10,7 @@ import {
   ChevronRight,
   ChevronDown,
   Moon,
-  Sun,
-  Smartphone,
-  Monitor
+  Sun
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProjects } from '@/hooks/useProjects';
@@ -72,10 +70,6 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
     updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
   };
 
-  const toggleViewMode = () => {
-    updateSettings({ viewMode: settings.viewMode === 'mobile' ? 'desktop' : 'mobile' });
-  };
-
   const renderFileTree = (nodes: FileNode[] | undefined, depth = 0) => {
     if (!nodes) return null;
     return nodes.map((node) => {
@@ -103,7 +97,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             <span className='truncate'>{node.name}</span>
           </div >
           {isFolder && isExpanded && node.children && (
-            <div>{renderFileTree(node.children, depth + 1)}</div >
+            <div>{renderFileTree(node.children, depth + 1)}</div>
           )}
         </div >
       );
@@ -116,7 +110,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
         <div className='w-8 h-8 bg-primary rounded-lg flex items-center justify-center'>
           <div className='w-4 h-4 bg-primary-foreground rounded-sm' />
         </div >
-        <span className='font-bold text-lg tracking-tight'>BuilderAI</span >
+        <span className='font-bold text-lg tracking-tight'>BuilderAI</span>
       </div >
 
       <div className='p-4'>
@@ -185,7 +179,7 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
             >
               <div className='flex items-center gap-2 truncate'>
                 <Folder className='w-4 h-4 flex-shrink-0' />
-                <span className='truncate'>{project.name}</span >
+                <span className='truncate'>{project.name}</span>
               </div >
               <MoreVertical className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' />
             </button>
@@ -211,15 +205,6 @@ export function WorkspaceSidebar({ onProjectCreated }: WorkspaceSidebarProps) {
           >
             {settings.theme === 'light' ? <Moon className='w-4 h-4' /> : <Sun className='w-4 h-4' />}
             {settings.theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-          </Button>
-
-          <Button 
-            variant='ghost' 
-            className='w-full justify-start gap-2 text-muted-foreground'
-            onClick={toggleViewMode}
-          >
-            {settings.viewMode === 'desktop' ? <Smartphone className='w-4 h-4' /> : <Monitor className='w-4 h-4' />}
-            {settings.viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
           </Button>
         </div >
       </div >

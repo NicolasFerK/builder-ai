@@ -33,7 +33,7 @@ export default function ProjectWorkspace() {
   const isMobileMode = settings.viewMode === 'mobile';
 
   return (
-    <div className={`h-screen w-full flex overflow-hidden bg-background ${isMobileMode ? 'max-w-[430px] mx-auto border-x shadow-2xl' : ''}`}>
+    <div className='h-screen w-full flex overflow-hidden bg-background'>
       <WorkspaceSidebar />
       <div className='flex-1 flex overflow-hidden'>
         <ResizablePanelGroup direction='horizontal' className='flex-1'>
