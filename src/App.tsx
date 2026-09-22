@@ -1,28 +1,18 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import ProjectWorkspace from "./pages/ProjectWorkspace";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Routes, Route } from 'react-router-dom';
+import Dashboard from './pages/Dashboard';
+import ProjectWorkspace from './pages/ProjectWorkspace';
+import ERPPage from './pages/ERPPage';
+import NotFound from './pages/NotFound';
 
-const App = () => {
-  console.log("App component mounted");
+function App() {
   return (
-    <TooltipProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/project/:projectId" element={<ProjectWorkspace />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      <Toaster />
-      <Sonner />
-    </TooltipProvider>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/workspace/:projectId" element={<ProjectWorkspace />} />
+      <Route path="/erp" element={<ERPPage />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
-};
+}
 
 export default App;
