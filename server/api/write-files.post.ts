@@ -6,6 +6,10 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { files, projectId } = body;
 
+  console.log(`[REAL-APPLY] SERVER PROJECT ID: ${projectId}`);
+  console.log(`[REAL-APPLY] SERVER PROJECT ROOT: ${path.join(process.cwd(), 'projects', projectId)}`);
+  console.log(`[REAL-APPLY] SERVER FILE PATHS: ${JSON.stringify(files.map((f: any) => f.path))}`);
+
   if (!projectId) {
     throw createError({
       statusCode: 400,
@@ -19,7 +23,7 @@ export default defineEventHandler(async (event) => {
   try {
     for (const file of files) {
       // Prevent path traversal
-      const sanitizedPath = path.normalize(file.path).replace(/^(\.\.(\/|\\|$))+/, '');
+      const sanitizedPath = path.normalize(file.path).replace(/^(\\.\\.(\\/|\\\\|$))+/, '');
       const filePath = path.join(projectDir, sanitizedPath);
       
       // Double check that the filePath is still within projectDir
@@ -31,6 +35,8 @@ export default defineEventHandler(async (event) => {
       await fs.mkdir(dirPath, { recursive: true });
       await fs.writeFile(filePath, file.content, 'utf-8');
     }
+    
+    console.log(`[REAL-APPLY] FILES WRITTEN: ${JSON.stringify(files.map((f: any) => f.path))}`);
     return { success: true };
   } catch (error: any) {
     console.error('Failed to write files:', error);

@@ -45,12 +45,14 @@ export function ChatPanel() {
   const handleApplyCode = async (content: string) => {
     if (!currentProject) return;
 
-    console.log('[APPLY] raw AI response:', content);
+    console.log(`[REAL-APPLY] RAW RESPONSE: ${content}`);
+    console.log(`[REAL-APPLY] RAW RESPONSE LENGTH: ${content.length}`);
 
+    console.log(`[REAL-APPLY] PARSER INPUT: ${content}`);
     const blocks = parseCodeBlocks(content);
-    console.log('[APPLY] extracted files:', blocks);
-    console.log('[APPLY] file count:', blocks.length);
-    console.log('[APPLY] file paths:', blocks.map(b => b.path));
+    console.log(`[REAL-APPLY] PARSER OUTPUT: ${JSON.stringify(blocks)}`);
+    console.log(`[REAL-APPLY] PARSED FILE COUNT: ${blocks.length}`);
+    console.log(`[REAL-APPLY] PARSED FILE PATHS: ${JSON.stringify(blocks.map(b => b.path))}`);
 
     if (blocks.length === 0) {
       toast({
@@ -68,7 +70,7 @@ export function ChatPanel() {
         updatedFiles = updateFileInTree(updatedFiles, block.path, block.content);
       }
 
-      console.log('[APPLY] write-files payload:', updatedFiles);
+      console.log(`[REAL-APPLY] BEFORE UPDATE PROJECT: ${JSON.stringify(updatedFiles.map(f => f.path))}`);
 
       updateProject(currentProject.id, { files: updatedFiles });
       
@@ -136,7 +138,7 @@ export function ChatPanel() {
         const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `(Simulated) I've received your request: "${currentInput || 'Special command'}". Please configure your real API in Settings to get real responses!`,
+          content: `(Simulated) I've received your request: \"${currentInput || 'Special command'}\". Please configure your real API in Settings to get real responses!`,
           timestamp: Date.now(),
         };
         updateProject(currentProject.id, {

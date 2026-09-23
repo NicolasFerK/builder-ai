@@ -44,6 +44,7 @@ export function useProjects() {
   };
 
   const updateProject = async (projectId: string, updates: Partial<Project>) => {
+    console.log(`[REAL-APPLY] UPDATE PROJECT FILES: ${JSON.stringify(updates.files?.map(f => f.path))}`);
     const updatedProjects = projects.map((p) =>
       p.id === projectId ? { ...p, ...updates, lastModified: Date.now() } : p
     );
@@ -56,6 +57,7 @@ export function useProjects() {
       try {
         const project = updatedProjects.find(p => p.id === projectId);
         if (project && project.files) {
+          console.log(`[REAL-APPLY] WRITE FILES PAYLOAD: ${JSON.stringify({ files: project.files, projectId: projectId })}`);
           await fetch('/api/write-files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
