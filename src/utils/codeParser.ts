@@ -7,44 +7,111 @@ export interface ExtractedCode {
 }
 
 export function parseCodeBlocks(text: string): ExtractedCode[] {
-  console.log('[APPLY] parsing text:', text);
-  const codeBlocks: ExtractedCode[] = [];
-  // Corrected regex for markdown code blocks
-  const regex = /```(\w+)?\s*\n([\s\S]*?)\n```/g;
-  let match;
+  console.log('[APPLY] raw AI response:', text);
+  const extracted: ExtractedCode[] = [];
 
-  while ((match = regex.exec(text)) !== null) {
+  // 1. Try to parse as JSON first (Format 4)
+  try {
+    // Find JSON block if it's wrapped in markdown, otherwise try whole text
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\[\s*\{.*\}\s*\]/s);
+    if (jsonMatch) {
+      const jsonContent = jsonMatch[1] || jsonMatch[0];
+      const parsed = JSON.parse(jsonContent.trim());
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item.path && item.content) {
+            extracted.push({
+              path: item.path,
+              language: item.language || 'text',
+              content: item.content
+            });
+          }
+        }
+        if (extracted.length > 0) {
+          console.log('[APPLY] parsed as JSON format', extracted.length, 'files');
+          return extracted;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[APPLY] JSON parsing failed, trying other formats');
+  }
+
+  // 2. Try to parse markdown code blocks and their preceding file declarations (Formats 1, 2, 3)
+  const codeBlockRegex = /```(\w+)?\s*\n([\s\S]*?)\n```/g;
+  let match;
+  let lastIndex = 0;
+  
+  const blocks: { index: number, language: string, content: string, preContent: string }[] = [];
+  
+  while ((match = codeBlockRegex.exec(text)) !== null) {
     const language = match[1] || 'text';
     const content = match[2];
-    console.log('[APPLY] found match - language:', language, 'content preview:', content.substring(0, 50));
+    const preContent = text.substring(lastIndex, match.index);
     
-    const lines = content.split('\n');
-    const firstLine = lines[0].trim();
+    blocks.push({
+      index: match.index,
+      language,
+      content,
+      preContent
+    });
     
-    // Corrected regex for path comments like // src/App.tsx or /* src/App.tsx */
-    const pathMatch = firstLine.match(/^(?:\/\/\s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/*)/);
-    
-    let path = '';
-    let actualContent = content;
-    
-    if (pathMatch && pathMatch[1]) {
-      path = pathMatch[1];
-      actualContent = lines.slice(1).join('\n');
-      console.log('[APPLY] path found via comment:', path);
-    } else {
-      console.log('[APPLY] no path found via comment, using language fallback');
-      if (language === 'html') path = 'index.html';
-      else if (language === 'css') path = 'src/index.css';
-      else if (language === 'javascript' || language === 'js') path = 'src/index.js';
-      else if (language === 'typescript' || language === 'ts') path = 'src/index.ts';
-      else if (language === 'tsx') path = 'src/App.tsx';
-      else path = 'README.md';
-      console.log('[APPLY] assigned path:', path);
-    }
-    codeBlocks.push({ path, language, content: actualContent.trim() });
+    lastIndex = codeBlockRegex.lastIndex;
   }
-  console.log('[APPLY] total extracted blocks:', codeBlocks.length);
-  return codeBlocks;
+
+  for (const block of blocks) {
+    let path = '';
+    let content = block.content;
+
+    // Try to find path in preContent (Formats 2 and 3)
+    // Format 2: FILE: src/App.tsx
+    // Format 3: src/App.tsx
+    const preContentTrimmed = block.preContent.trim();
+    if (preContentTrimmed) {
+      // Match "FILE: path/to/file" or just "path/to/file" at the end of the preContent
+      const fileDeclarationRegex = /(?:FILE:\s*|)([a-zA-Z0-9._/\-]+\.[a-zA-Z0-9]+)$/m;
+      const preMatch = preContentTrimmed.match(fileDeclarationRegex);
+      if (preMatch) {
+        path = preMatch[1];
+        console.log('[APPLY] path found in preContent:', path);
+      }
+    }
+
+    // Format 1: Path in comment inside the content (// src/App.tsx)
+    if (!path) {
+      const lines = content.split('\n');
+      const firstLine = lines[0].trim();
+      const pathMatch = firstLine.match(/^(?:\/\/\s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/*)/);
+      
+      if (pathMatch && pathMatch[1]) {
+        path = pathMatch[1];
+        content = lines.slice(1).join('\n');
+        console.log('[APPLY] path found via comment inside block:', path);
+      }
+    }
+
+    // Fallbacks if no path was found
+    if (!path) {
+      console.log('[APPLY] no path found, using language fallback');
+      if (block.language === 'html') path = 'index.html';
+      else if (block.language === 'css') path = 'src/index.css';
+      else if (block.language === 'javascript' || block.language === 'js') path = 'src/index.js';
+      else if (block.language === 'typescript' || block.language === 'ts') path = 'src/index.ts';
+      else if (block.language === 'tsx') path = 'src/App.tsx';
+      else path = 'README.md';
+      console.log('[APPLY] assigned fallback path:', path);
+    }
+
+    extracted.push({
+      path,
+      language: block.language,
+      content: content.trim()
+    });
+  }
+
+  console.log('[APPLY] total extracted files:', extracted.length);
+  console.log('[APPLY] extracted file paths:', extracted.map(e => e.path));
+  return extracted;
 }
 
 export function updateFileInTree(nodes: FileNode[], targetPath: string, content: string): FileNode[] {
