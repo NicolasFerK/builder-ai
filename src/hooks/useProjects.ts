@@ -25,10 +25,10 @@ export function useProjects() {
         lastModified: Date.now(),
         chatHistory: [{ id: 'init', role: 'assistant', content: 'Seu projeto de Login e Dashboard foi carregado com sucesso!', timestamp: Date.now() }],
         files: [
-          { id: 'index-html', name: 'index.html', type: 'file', content: '<!DOCTYPE html>\\n<html lang="en">\\n<head>\\n  <meta charset="UTF-8" />\\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\\n  <title>Login App</title>\\n</head>\\n<body id="root"></body>\\n<script type="module" src="/src/main.tsx"></script>\\n</html>' },
-          { id: 'vite-config', name: 'vite.config.ts', type: 'file', content: 'import { defineConfig } from "vite";\\nimport react from "@vitejs/plugin-react";\\n\\nexport default defineConfig({ plugins: [react()] });' },
-          { id: 'package-json', name: 'package.json', type: 'file', content: '{\\n  "name": "login-app",\\n  "version": "1.0.0",\\n  "dependencies": {\\n    "react": "^18.2.0",\\n    "react-dom": "^18.2.0",\\n    "lucide-react": "latest",\\n    "react-router-dom": "latest"\\n  },\\n  "devDependencies": {\\n    "@vitejs/plugin-react": "^4.0.0",\\n    "vite": "^4.0.0"\\n  }\\n}' },
-          { id: 'main-tsx', name: 'src/main.tsx', type: 'file', content: 'import React from "react";\\nimport ReactDOM from "react-dom/client";\\nimport App from "./App";\\nimport "./globals.css";\\n\\nReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' },
+          { id: 'index-html', name: 'index.html', type: 'file', content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>Login App</title>\n</head>\n<body id="root"></body>\n<script type="module" src="/src/main.tsx"></script>\n</html>' },
+          { id: 'vite-config', name: 'vite.config.ts', type: 'file', content: 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({ plugins: [react()] });' },
+          { id: 'package-json', name: 'package.json', type: 'file', content: '{\n  "name": "login-app",\n  "version": "1.0.0",\n  "dependencies": {\n    "react": "^18.2.0",\n    "react-dom": "^18.2.0",\n    "lucide-react": "latest",\n    "react-router-dom": "latest"\n  },\n  "devDependencies": {\n    "@vitejs/plugin-react": "^4.0.0",\n    "vite": "^4.0.0"\n  }\n}' },
+          { id: 'main-tsx', name: 'src/main.tsx', type: 'file', content: 'import React from "react";\nimport ReactDOM from "react-dom/client";\nimport App from "./App";\nimport "./globals.css";\n\nReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' },
           { 
             id: 'app-tsx', 
             name: 'src/App.tsx', 
@@ -98,7 +98,7 @@ export default function App() {
               {error && <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md text-center font-medium">{error}</div>}
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={authState === "logging_in"}>{authState === "logging_in" ? "Carregando..." : "Entrar"}</Button>
             </form>
-            <div className="mt-6 text-center text-xs text-muted-foreground">Dica: admin@teste.com / 123456</div>
+            <div className="mt-6 text-center text-xs text-muted-foreground">Dica: admin@teste.com / 123456</div >
           </CardContent>
         </Card>
       </div >
@@ -144,12 +144,11 @@ export default function App() {
           </Card>
         </div >
       </main>
-    </div>
+    </div >
   );
-}` },
-          }
+` },
         ],
-        projectMemory: '# Project Context\\n\\n## Project\\n\\nName: ',
+        projectMemory: '# Project Context\n\n## Project\n\nName: ',
         sessionSummaries: [],
         currentSessionSummary: undefined,
       };
@@ -173,7 +172,7 @@ export default function App() {
       lastModified: Date.now(),
       chatHistory: [{ id: crypto.randomUUID(), role: 'assistant', content: 'Hello!', timestamp: Date.now() }],
       files: [],
-      projectMemory: '# Project Context\\n\\n## Project\\n\\nName: ',
+      projectMemory: '# Project Context\n\n## Project\n\nName: ',
       sessionSummaries: [],
       currentSessionSummary: undefined,
     };
