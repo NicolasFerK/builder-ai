@@ -7,31 +7,37 @@ export interface ExtractedCode {
 }
 
 export function parseCodeBlocks(text: string): ExtractedCode[] {
+  console.log('[APPLY] parsing text:', text);
   const codeBlocks: ExtractedCode[] = [];
-  const regex = /```(\w+)?\s*\n([\s\S]*?)\n```/g;
+  const regex = /```(\\w+)?\\s*\\n([\\s\\S]*?)\\n```/g;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
     const language = match[1] || 'text';
     const content = match[2];
-    const lines = content.split('\n');
+    console.log('[APPLY] found match - language:', language, 'content preview:', content.substring(0, 50));
+    const lines = content.split('\\n');
     const firstLine = lines[0].trim();
-    const pathMatch = firstLine.match(/^(?:\/\/\s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/*)/);
+    const pathMatch = firstLine.match(/^(?:\\/\\/\\s*|\\/\\*\\s*)([\\w\\/\\.\\-]+\\.\\w+)(?:\\s*\\*\\/|\\s*\\/*)/);
     let path = '';
     let actualContent = content;
     if (pathMatch && pathMatch[1]) {
       path = pathMatch[1];
-      actualContent = lines.slice(1).join('\n');
+      actualContent = lines.slice(1).join('\\n');
+      console.log('[APPLY] path found via comment:', path);
     } else {
+      console.log('[APPLY] no path found via comment, using language fallback');
       if (language === 'html') path = 'index.html';
       else if (language === 'css') path = 'src/index.css';
       else if (language === 'javascript' || language === 'js') path = 'src/index.js';
       else if (language === 'typescript' || language === 'ts') path = 'src/index.ts';
       else if (language === 'tsx') path = 'src/App.tsx';
       else path = 'README.md';
+      console.log('[APPLY] assigned path:', path);
     }
     codeBlocks.push({ path, language, content: actualContent.trim() });
   }
+  console.log('[APPLY] total extracted blocks:', codeBlocks.length);
   return codeBlocks;
 }
 

@@ -45,7 +45,13 @@ export function ChatPanel() {
   const handleApplyCode = async (content: string) => {
     if (!currentProject) return;
 
+    console.log('[APPLY] raw AI response:', content);
+
     const blocks = parseCodeBlocks(content);
+    console.log('[APPLY] extracted files:', blocks);
+    console.log('[APPLY] file count:', blocks.length);
+    console.log('[APPLY] file paths:', blocks.map(b => b.path));
+
     if (blocks.length === 0) {
       toast({
         variant: 'destructive',
@@ -61,6 +67,8 @@ export function ChatPanel() {
       for (const block of blocks) {
         updatedFiles = updateFileInTree(updatedFiles, block.path, block.content);
       }
+
+      console.log('[APPLY] write-files payload:', updatedFiles);
 
       updateProject(currentProject.id, { files: updatedFiles });
       
