@@ -81,7 +81,7 @@ export function parseCodeBlocks(text: string): ExtractedCode[] {
     if (!path) {
       const lines = content.split('\n');
       const firstLine = lines[0].trim();
-      const pathMatch = firstLine.match(/^(?:\/\/\s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/*)/);
+      const pathMatch = firstLine.match(/^(?:\/\/ \s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/\*)/);
       
       if (pathMatch && pathMatch[1]) {
         path = pathMatch[1];
@@ -90,16 +90,10 @@ export function parseCodeBlocks(text: string): ExtractedCode[] {
       }
     }
 
-    // Fallbacks if no path was found
+    // If no path was found, discard the block and log
     if (!path) {
-      console.log('[APPLY] no path found, using language fallback');
-      if (block.language === 'html') path = 'index.html';
-      else if (block.language === 'css') path = 'src/index.css';
-      else if (block.language === 'javascript' || block.language === 'js') path = 'src/index.js';
-      else if (block.language === 'typescript' || block.language === 'ts') path = 'src/index.ts';
-      else if (block.language === 'tsx') path = 'src/App.tsx';
-      else path = 'README.md';
-      console.log('[APPLY] assigned fallback path:', path);
+      console.log('[APPLY] no path found, discarding block:', block.language);
+      continue;
     }
 
     extracted.push({
