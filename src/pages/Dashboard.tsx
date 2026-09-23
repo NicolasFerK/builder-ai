@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen, Clock, Settings as SettingsIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,15 @@ type DashboardFormValues = {
 };
 
 export default function Dashboard() {
+  console.log("Dashboard component rendering");
   const { projects, createProject, deleteProject, isLoading } = useProjects();
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const { register, handleSubmit, reset } = useForm<DashboardFormValues>();
+
+  useEffect(() => {
+    console.log("Dashboard component mounted. Projects:", projects);
+  }, [projects]);
 
   const onSubmit = (data: DashboardFormValues) => {
     try {
@@ -161,7 +166,7 @@ export default function Dashboard() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete "{projectToDelete?.name}" and all its data. This action cannot be undone.
+                This will permanently delete \"{projectToDelete?.name}\" and all its data. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
