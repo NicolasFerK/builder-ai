@@ -84,10 +84,13 @@ export function ChatPanel() {
     contextOptions?: ContextBuilderOptions
   ) => {
     if (!input.trim() && !customPrompt && !customMessages) return;
-    if (!currentProject) return;
+    if (!currentProject) {
+      console.error('[BUILDERAI DEBUG] ERROR: currentProject is undefined. Cannot send message.');
+      return;
+    }
 
     // [BUILDERAI DEBUG]
-    console.log(`[BUILDERAI DEBUG]\nUSER MESSAGE RECEIVED: ${input || customPrompt || 'N/A'}\n`);
+    console.log(`[BUILDERAI DEBUG] USER MESSAGE RECEIVED: ${input || customPrompt || 'N/A'}`);
 
     // Warning for high context
     if (contextUsage > 80 && !customPrompt && !customMessages) {
@@ -148,13 +151,14 @@ export function ChatPanel() {
       const finalMessages = [{ role: 'system', content: systemContext }, ...messagesToSend];
 
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nFINAL MODEL INPUT: ${JSON.stringify(finalMessages)}\n`);
+      console.log(`[BUILDERAI DEBUG] FINAL MODEL INPUT: ${JSON.stringify(finalMessages)}`);
 
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nREQUEST SENT: ${settings.apiUrl}\nBODY: ${JSON.stringify({
+      console.log(`[BUILDERAI DEBUG] REQUEST SENT: ${settings.apiUrl}`);
+      console.log(`[BUILDERAI DEBUG] REQUEST BODY: ${JSON.stringify({
         model: settings.modelName || 'default',
         messages: finalMessages,
-      })}\n`);
+      })}`);
 
       const response = await fetch(settings.apiUrl, {
         method: 'POST',
@@ -169,7 +173,7 @@ export function ChatPanel() {
       });
 
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nHTTP STATUS: ${response.status}\n`);
+      console.log(`[BUILDERAI DEBUG] HTTP STATUS: ${response.status}`);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.statusText}`);
@@ -178,7 +182,7 @@ export function ChatPanel() {
       const data = await response.json();
       
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nRESPONSE RECEIVED: ${JSON.stringify(data)}\n`);
+      console.log(`[BUILDERAI DEBUG] RESPONSE RECEIVED: ${JSON.stringify(data)}`);
       
       let aiContent = '';
       if (data.choices && data.choices[0] && data.choices[0].message) {
@@ -190,7 +194,7 @@ export function ChatPanel() {
       }
 
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nPARSED RESPONSE: ${aiContent}\n`);
+      console.log(`[BUILDERAI DEBUG] PARSED RESPONSE: ${aiContent}`);
 
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -200,9 +204,7 @@ export function ChatPanel() {
       };
 
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nASSISTANT MESSAGE OBJECT: ${JSON.stringify(aiMessage)}\n`);
-
-      console.log(`[BUILDERAI FLOW DEBUG]\nMODEL RESPONSE: ${aiContent}\n`);
+      console.log(`[BUILDERAI DEBUG] ASSISTANT MESSAGE OBJECT: ${JSON.stringify(aiMessage)}`);
 
       if (!customMessages) {
         updateProject(currentProject.id, {
@@ -218,12 +220,12 @@ export function ChatPanel() {
       const errorMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to communicate with the AI API. Check your settings and CORS configuration.'}`,
+        content: `BuilderAI Error: ${error instanceof Error ? error.message : 'Failed to communicate with the AI API. Check your settings and CORS configuration.'}`,
         timestamp: Date.now(),
       };
       
       // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG]\nADDING ERROR MESSAGE TO CHAT: ${errorMessage.content}\n`);
+      console.log(`[BUILDERAI DEBUG] ADDING ERROR MESSAGE TO CHAT: ${errorMessage.content}`);
       
       updateProject(currentProject.id, {
         chatHistory: [...updatedHistory, errorMessage]
