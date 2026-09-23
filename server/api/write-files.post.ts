@@ -1,24 +1,42 @@
-import { defineEventHandler, readBody } from 'h3';
+import { defineEventHandler, readBody, createError } from 'h3';
 import fs from 'fs/promises';
 import path from 'path';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
-  const { files } = body;
+  const { files, projectId } = body;
+
+  if (!projectId) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'projectId is required',
+    });
+  }
+
+  const projectsRoot = path.join(process.cwd(), 'projects');
+  const projectDir = path.join(projectsRoot, projectId);
 
   try {
     for (const file of files) {
-      const filePath = path.join(process.cwd(), file.path);
+      // Prevent path traversal
+      const sanitizedPath = path.normalize(file.path).replace(/^(\.\.(\/|\\|$))+/, '');
+      const filePath = path.join(projectDir, sanitizedPath);
+      
+      // Double check that the filePath is still within projectDir
+      if (!filePath.startsWith(projectDir)) {
+        throw new Error(`Attempted path traversal: ${file.path}`);
+      }
+
       const dirPath = path.dirname(filePath);
       await fs.mkdir(dirPath, { recursive: true });
       await fs.writeFile(filePath, file.content, 'utf-8');
     }
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to write files:', error);
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to write files to filesystem',
+      statusMessage: error.message || 'Failed to write files to filesystem',
     });
   }
 });
