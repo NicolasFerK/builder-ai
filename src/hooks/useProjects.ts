@@ -181,11 +181,30 @@ export default function App() {
     return newProject;
   };
 
-  const updateProject = (projectId: string, updates: Partial<Project>) => {
+  const updateProject = async (projectId: string, updates: Partial<Project>) => {
     const updatedProjects = projects.map((p) =>
       p.id === projectId ? { ...p, ...updates, lastModified: Date.now() } : p
     );
+    
+    // Save to localStorage for persistence in the UI
     saveProjects(updatedProjects);
+
+    // If we are updating files, also sync them to the filesystem
+    if (updates.files) {
+      try {
+        const project = updatedProjects.find(p => p.id === projectId);
+        if (project && project.files) {
+          await fetch('/api/write-files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: project.files }),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to sync files to filesystem:', error);
+        // We don't throw here to avoid breaking the UI, but we log it.
+      }
+    }
   };
 
   const deleteProject = (projectId: string) => {
