@@ -9,21 +9,27 @@ export interface ExtractedCode {
 export function parseCodeBlocks(text: string): ExtractedCode[] {
   console.log('[APPLY] parsing text:', text);
   const codeBlocks: ExtractedCode[] = [];
-  const regex = /```(\\w+)?\\s*\\n([\\s\\S]*?)\\n```/g;
+  // Corrected regex for markdown code blocks
+  const regex = /```(\w+)?\s*\n([\s\S]*?)\n```/g;
   let match;
 
   while ((match = regex.exec(text)) !== null) {
     const language = match[1] || 'text';
     const content = match[2];
     console.log('[APPLY] found match - language:', language, 'content preview:', content.substring(0, 50));
-    const lines = content.split('\\n');
+    
+    const lines = content.split('\n');
     const firstLine = lines[0].trim();
-    const pathMatch = firstLine.match(/^(?:\\/\\/\\s*|\\/\\*\\s*)([\\w\\/\\.\\-]+\\.\\w+)(?:\\s*\\*\\/|\\s*\\/*)/);
+    
+    // Corrected regex for path comments like // src/App.tsx or /* src/App.tsx */
+    const pathMatch = firstLine.match(/^(?:\/\/\s*|\/\*\s*)([\w\/\.\-]+\.\w+)(?:\s*\*\/|\s*\/*)/);
+    
     let path = '';
     let actualContent = content;
+    
     if (pathMatch && pathMatch[1]) {
       path = pathMatch[1];
-      actualContent = lines.slice(1).join('\\n');
+      actualContent = lines.slice(1).join('\n');
       console.log('[APPLY] path found via comment:', path);
     } else {
       console.log('[APPLY] no path found via comment, using language fallback');
