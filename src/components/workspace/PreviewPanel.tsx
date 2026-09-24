@@ -31,6 +31,8 @@ export function PreviewPanel({}: PreviewPanelProps) {
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [devServerUrl, setDevServerUrl] = useState<string>('');
   const [status, setStatus] = useState<'loading' | 'starting' | 'running' | 'error' | 'not_found'>('loading');
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   const fetchPreviewStatus = useCallback(async () => {
     if (!projectId) return;
@@ -56,43 +58,58 @@ export function PreviewPanel({}: PreviewPanelProps) {
       if (data.status === 'not_found') {
         setStatus('not_found');
         setDiagnostics(null);
+        setRetryCount(0);
       } else if (data.status === 'running') {
         setDevServerUrl(data.url);
         setStatus('running');
         setError(null);
         setDiagnostics(null);
+        setRetryCount(0);
       } else if (data.status === 'starting') {
         setStatus('starting');
         setDiagnostics(null);
+        setRetryCount(0);
       } else if (data.status === 'error') {
         setStatus('error');
         setError(data.diagnostics?.error || 'Server error. Check logs.');
         setDiagnostics(data.diagnostics || null);
+        // We don't reset retryCount here, it's handled in the useEffect
       }
     } catch (e) {
       console.error('Failed to discover dev server URL', e);
       setStatus('error');
       setError('Failed to connect to preview server');
       setDiagnostics(null);
+      throw e; // Rethrow to be caught by the caller/useEffect
     }
   }, [projectId]);
 
   useEffect(() => {
     if (!projectId) return;
 
-    fetchPreviewStatus();
+    if (retryCount >= MAX_RETRIES && status === 'error') {
+        return;
+    }
+
+    fetchPreviewStatus().catch(() => {
+        setRetryCount(prev => prev + 1);
+    });
 
     // Polling for status changes (e.g. from starting to running)
     const interval = setInterval(() => {
       // If we are already running, we might still want to poll to ensure it's still up,
       // but mostly we poll while it's 'starting'.
       if (status === 'starting' || status === 'loading' || status === 'error') {
-        fetchPreviewStatus();
+        if (retryCount < MAX_RETRIES) {
+            fetchPreviewStatus().catch(() => {
+                setRetryCount(prev => prev + 1);
+            });
+        }
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [projectId, status, fetchPreviewStatus]);
+  }, [projectId, status, fetchPreviewStatus, retryCount]);
 
   const handleReload = async () => {
     setIsReloading(true);
