@@ -28,6 +28,7 @@ export function ChatPanel() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [lastUndoState, setLastUndoState] = useState<{ files: any[], messageId: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const currentProject = projects.find(p => p.id === projectId);
@@ -43,7 +44,7 @@ export function ChatPanel() {
     }
   }, [currentProject?.chatHistory, isTyping, isSummarizing]);
 
-  const handleApplyCode = async (content: string) => {
+  const handleApplyCode = async (content: string, messageId: string) => {
     if (!currentProject) return;
 
     console.log(`[REAL-APPLY] RAW RESPONSE: ${content}`);
@@ -65,16 +66,22 @@ export function ChatPanel() {
     }
 
     try {
+      const previousFiles = [...currentProject.files];
       let updatedFiles = [...currentProject.files];
       
       for (const block of blocks) {
         updatedFiles = updateFileInTree(updatedFiles, block.path, block.content);
       }
 
-      console.log(`[REAL-APPLY] BEFORE UPDATE PROJECT: ${JSON.stringify(updatedFiles.map(f => f.path))}`);
+      console.log(`[REAL-APPLY] BEFORE UPDATE PROJECT: ${JSON.stringify(updatedFiles.map(f => f.name))}`);
 
       updateProject(currentProject.id, { files: updatedFiles });
       
+      setLastUndoState({
+        files: previousFiles,
+        messageId: messageId
+      });
+
       toast({
         title: 'Code applied successfully!',
         description: `Updated ${blocks.length} file(s) in your project.`,
@@ -87,6 +94,17 @@ export function ChatPanel() {
         description: 'An error occurred while updating the project files.',
       });
     }
+  };
+
+  const handleUndo = () => {
+    if (!lastUndoState || !currentProject) return;
+
+    updateProject(currentProject.id, { files: lastUndoState.files });
+    setLastUndoState(null);
+    toast({
+      title: 'Changes undone!',
+      description: 'Reverted to the previous file state.',
+    });
   };
 
   const handleSendMessage = async (
@@ -380,16 +398,28 @@ export function ChatPanel() {
                   </span>
                   
                   {message.role === 'assistant' && parseCodeBlocks(message.content).length > 0 && (
-                    <div className='mt-2 flex justify-start'>
+                    <div className='mt-2 flex justify-start gap-2'>
                       <Button 
                         variant='outline' 
                         size='sm' 
                         className='gap-2 h-8 text-xs'
-                        onClick={() => handleApplyCode(message.content)}
+                        onClick={() => handleApplyCode(message.content, message.id)}
                       >
                         <Play className='w-3 h-3' />
                         Apply Code to Files
                       </Button>
+
+                      {lastUndoState?.messageId === message.id && (
+                        <Button 
+                          variant='secondary' 
+                          size='sm' 
+                          className='gap-2 h-8 text-xs text-destructive hover:text-destructive'
+                          onClick={handleUndo}
+                        >
+                          <RotateCcw className='w-3 h-3' />
+                          Undo
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
