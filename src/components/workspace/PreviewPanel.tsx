@@ -45,24 +45,37 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
   };
 
   // Extract dependencies from package.json
-  const getSandpackDependencies = () => {
+  const { dependencies, devDependencies } = React.useMemo(() => {
     const packageJsonNode = findFileByName(files, 'package.json');
     if (packageJsonNode && packageJsonNode.content) {
       try {
         const packageJson = JSON.parse(packageJsonNode.content);
-        const dependencies = packageJson.dependencies;
-        if (dependencies && typeof dependencies === 'object') {
-          return dependencies as Record<string, string>;
-        }
+        const dependencies = packageJson.dependencies || {};
+        const devDependencies = packageJson.devDependencies || {};
+
+        const filteredDevDependencies = Object.fromEntries(
+          Object.entries(devDependencies).filter(([pkg]) =>
+            pkg !== 'vite' &&
+            !pkg.startsWith('@vitejs/plugin-react') &&
+            !pkg.startsWith('@types/')
+          )
+        );
+
+        return {
+          dependencies: dependencies as Record<string, string>,
+          devDependencies: filteredDevDependencies as Record<string, string>,
+        };
       } catch (error) {
         console.error('Failed to parse package.json', error);
       }
     }
-    return { 'react': 'latest', 'react-dom': 'latest' };
-  };
+    return {
+      dependencies: { 'react': 'latest', 'react-dom': 'latest' },
+      devDependencies: {}
+    };
+  }, [files]);
 
-  const sandpackFiles = flattenFiles(files, "", "package.json");
-  const sandpackDependencies = getSandpackDependencies();
+  const sandpackFiles = React.useMemo(() => flattenFiles(files, "", "package.json"), [files]);
 
   const handleReload = () => {
     setIsReloading(true);
@@ -123,7 +136,7 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
           <SandpackProvider
             template="vite-react"
             files={sandpackFiles}
-            customSetup={{ dependencies: sandpackDependencies }}
+            customSetup={{ dependencies, devDependencies }}
             style={{ height: '100%', width: '100%' }}
           >
             <SandpackPreview
