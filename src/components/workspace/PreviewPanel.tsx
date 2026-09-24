@@ -19,6 +19,8 @@ export function PreviewPanel({}: PreviewPanelProps) {
   const fetchPreviewStatus = useCallback(async () => {
     if (!projectId) return;
 
+    console.log('[PREVIEW-DEBUG] projectId', projectId);
+
     try {
       // First, ensure the server is started
       const startRes = await fetch('/api/start-preview', {

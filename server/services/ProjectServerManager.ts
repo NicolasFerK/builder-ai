@@ -31,6 +31,7 @@ class ProjectServerManager {
     }
 
     const port = await this.findFreePort(5174);
+    console.log('[PREVIEW-DEBUG] selected port', port);
     const url = `http://localhost:${port}`;
 
     const info: ProjectInfo = {
@@ -46,16 +47,36 @@ class ProjectServerManager {
       console.log(`[PREVIEW] projectId: ${projectId}`);
       console.log(`[PREVIEW] projectRoot: ${projectPath}`);
       console.log(`[PREVIEW] starting dev server on port: ${port}`);
+      console.log('[PREVIEW-DEBUG] projectId', projectId);
+      console.log('[PREVIEW-DEBUG] projectPath', projectPath);
 
       // Check if node_modules exists
       const nodeModulesPath = path.join(projectPath, 'node_modules');
+      const packageJsonPath = path.join(projectPath, 'package.json');
+      try {
+        await fs.access(packageJsonPath);
+        console.log('[PREVIEW-DEBUG] package.json exists');
+      } catch {
+        console.log('[PREVIEW-DEBUG] package.json does NOT exist');
+      }
+
       try {
         await fs.access(nodeModulesPath);
       } catch {
         console.log(`[PREVIEW] node_modules not found, installing dependencies in ${projectPath}...`);
-        await this.runCommand('npm', ['install'], projectPath);
+        console.log('[PREVIEW-DEBUG] npm install started');
+        try {
+          await this.runCommand('npm', ['install'], projectPath);
+          console.log('[PREVIEW-DEBUG] npm install exit code', 0);
+        } catch (err: any) {
+          console.error('[PREVIEW-DEBUG] npm install error', err.message);
+          // We can't easily get stderr from runCommand as it uses 'inherit'
+          // But we can log the error message
+          throw err;
+        }
       }
 
+      console.log('[PREVIEW-DEBUG] npm run dev started');
       const child = spawn('npm', ['run', 'dev', '--', '--port', port.toString()], {
         cwd: projectPath,
         shell: true,
@@ -67,27 +88,34 @@ class ProjectServerManager {
       child.stdout?.on('data', (data) => {
         const output = data.toString();
         console.log(`[PREVIEW] [${projectId}] stdout: ${output.trim()}`);
+        console.log('[PREVIEW-DEBUG] stdout', output.trim());
         if (output.includes('ready in') || output.includes('VITE v')) {
            info.status = 'running';
+           console.log('[PREVIEW-DEBUG] server status', info.status);
         }
       });
 
       child.stderr?.on('data', (data) => {
         const output = data.toString();
         console.error(`[PREVIEW] [${projectId}] stderr: ${output.trim()}`);
+        console.log('[PREVIEW-DEBUG] stderr', output.trim());
         if (output.toLowerCase().includes('error')) {
           info.status = 'error';
+          console.log('[PREVIEW-DEBUG] server status', info.status);
         }
       });
 
       child.on('error', (err) => {
         console.error(`[PREVIEW] [${projectId}] process error:`, err);
         info.status = 'error';
+        console.log('[PREVIEW-DEBUG] server status', info.status);
       });
 
       child.on('exit', (code) => {
         console.log(`[PREVIEW] [${projectId}] process exited with code ${code}`);
+        console.log('[PREVIEW-DEBUG] process exit', code);
         info.status = code === 0 ? 'stopped' : 'error';
+        console.log('[PREVIEW-DEBUG] server status', info.status);
         info.process = null;
       });
 
@@ -95,6 +123,7 @@ class ProjectServerManager {
     } catch (error) {
       console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
       info.status = 'error';
+      console.log('[PREVIEW-DEBUG] server status', info.status);
       return info;
     }
   }

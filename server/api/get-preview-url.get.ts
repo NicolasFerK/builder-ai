@@ -5,6 +5,8 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const projectId = query.projectId as string;
 
+  console.log('[PREVIEW-DEBUG] projectId', projectId);
+
   if (!projectId) {
     throw createError({
       statusCode: 400,
@@ -19,6 +21,8 @@ export default defineEventHandler(async (event) => {
       status: 'not_found',
     };
   }
+
+  console.log('[PREVIEW-DEBUG] preview URL', info.url);
 
   return {
     url: info.url,

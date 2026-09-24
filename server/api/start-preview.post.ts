@@ -5,6 +5,8 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const { projectId } = body;
 
+  console.log('[PREVIEW-DEBUG] projectId', projectId);
+
   if (!projectId) {
     throw createError({
       statusCode: 400,
