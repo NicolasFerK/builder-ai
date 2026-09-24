@@ -57,3 +57,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+.sp-wrapper, .sp-stack, .sp-preview-container, .sp-preview-iframe {
+  height: 100%;
+  width: 100%;
+}

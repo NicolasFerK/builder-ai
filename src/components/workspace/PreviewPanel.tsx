@@ -120,14 +120,16 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
             ? 'w-[375px] h-[667px]' 
             : 'w-full h-full max-w-5xl'
         }`}>
-          <SandpackProvider 
-            template="vite-react" 
+          <SandpackProvider
+            template="vite-react"
             files={sandpackFiles}
             customSetup={{ dependencies: sandpackDependencies }}
+            style={{ height: '100%', width: '100%' }}
           >
-            <SandpackPreview 
-              showOpenInCodeSandbox={false} 
-              showRefreshButton 
+            <SandpackPreview
+              showOpenInCodeSandbox={false}
+              showRefreshButton
+              style={{ height: '100%', width: '100%' }}
             />
           </SandpackProvider>
         </div>
