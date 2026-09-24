@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Play, MoreVertical, Zap, RotateCcw, Info } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -138,7 +139,7 @@ export function ChatPanel() {
         const aiMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `(Simulated) I've received your request: \"${currentInput || 'Special command'}\". Please configure your real API in Settings to get real responses!`,
+          content: `(Simulated) I've received your request: \\\"${currentInput || 'Special command'}\\\". Please configure your real API in Settings to get real responses!`,
           timestamp: Date.now(),
         };
         updateProject(currentProject.id, {
@@ -348,12 +349,31 @@ export function ChatPanel() {
                   </AvatarFallback>
                 </Avatar>
                 <div className={`flex flex-col max-w-[85%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`px-4 py-2 rounded-2xl text-sm ${
+                  <div className={`px-4 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
                     message.role === 'user' 
                       ? 'bg-primary text-primary-foreground rounded-tr-none' 
                       : 'bg-muted text-foreground rounded-tl-none'
                   }`}>
-                    {message.content}
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown
+                        components={{
+                          code({ node, inline, className, children, ...props }: any) {
+                            if (inline) {
+                              return <code className={className} {...props}>{children}</code>;
+                            }
+                            return (
+                              <pre className="bg-zinc-900 text-zinc-100 p-4 rounded-lg overflow-x-auto font-mono text-sm my-2">
+                                <code className={className} {...props}>{children}</code>
+                              </pre>
+                            );
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      message.content
+                    )}
                   </div>
                   <span className='text-[10px] text-muted-foreground mt-1 px-1'>
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
