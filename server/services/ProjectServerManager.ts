@@ -8,6 +8,14 @@ export interface ProjectInfo {
   port: number;
   url: string;
   status: 'running' | 'starting' | 'stopped' | 'error';
+  projectPath: string;
+  stdout: string;
+  stderr: string;
+  npmInstallError: string | null;
+  npmInstallExitCode: number | null;
+  npmRunDevError: string | null;
+  processExitCode: number | null;
+  error: string | null;
 }
 
 class ProjectServerManager {
@@ -39,6 +47,14 @@ class ProjectServerManager {
       port,
       url,
       status: 'starting',
+      projectPath,
+      stdout: '',
+      stderr: '',
+      npmInstallError: null,
+      npmInstallExitCode: null,
+      npmRunDevError: null,
+      processExitCode: null,
+      error: null,
     };
 
     this.projects.set(projectId, info);
@@ -66,12 +82,13 @@ class ProjectServerManager {
         console.log(`[PREVIEW] node_modules not found, installing dependencies in ${projectPath}...`);
         console.log('[PREVIEW-DEBUG] npm install started');
         try {
-          await this.runCommand('npm', ['install'], projectPath);
+          await this.runCommandWithOutput('npm', ['install'], projectPath);
+          info.npmInstallExitCode = 0;
           console.log('[PREVIEW-DEBUG] npm install exit code', 0);
         } catch (err: any) {
+          info.npmInstallError = err.message;
+          info.npmInstallExitCode = err.exitCode ?? -1;
           console.error('[PREVIEW-DEBUG] npm install error', err.message);
-          // We can't easily get stderr from runCommand as it uses 'inherit'
-          // But we can log the error message
           throw err;
         }
       }
@@ -87,6 +104,7 @@ class ProjectServerManager {
 
       child.stdout?.on('data', (data) => {
         const output = data.toString();
+        info.stdout += output;
         console.log(`[PREVIEW] [${projectId}] stdout: ${output.trim()}`);
         console.log('[PREVIEW-DEBUG] stdout', output.trim());
         if (output.includes('ready in') || output.includes('VITE v')) {
@@ -97,10 +115,12 @@ class ProjectServerManager {
 
       child.stderr?.on('data', (data) => {
         const output = data.toString();
+        info.stderr += output;
         console.error(`[PREVIEW] [${projectId}] stderr: ${output.trim()}`);
         console.log('[PREVIEW-DEBUG] stderr', output.trim());
         if (output.toLowerCase().includes('error')) {
           info.status = 'error';
+          info.npmRunDevError = output.trim();
           console.log('[PREVIEW-DEBUG] server status', info.status);
         }
       });
@@ -108,36 +128,51 @@ class ProjectServerManager {
       child.on('error', (err) => {
         console.error(`[PREVIEW] [${projectId}] process error:`, err);
         info.status = 'error';
+        info.error = err.message;
         console.log('[PREVIEW-DEBUG] server status', info.status);
       });
 
       child.on('exit', (code) => {
         console.log(`[PREVIEW] [${projectId}] process exited with code ${code}`);
         console.log('[PREVIEW-DEBUG] process exit', code);
+        info.processExitCode = code;
         info.status = code === 0 ? 'stopped' : 'error';
+        if (code !== 0 && !info.npmRunDevError) {
+           // If it's not a clean stop, and we don't have a specific error, maybe it's a crash
+           // But we'll let stderr capture it if possible
+        }
         console.log('[PREVIEW-DEBUG] server status', info.status);
         info.process = null;
       });
 
       return info;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
       info.status = 'error';
+      info.error = error.message;
       console.log('[PREVIEW-DEBUG] server status', info.status);
       return info;
     }
   }
 
-  private async runCommand(command: string, args: string[], cwd: string): Promise<void> {
+  private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, {
         cwd,
         shell: true,
-        stdio: 'inherit',
+        stdio: 'pipe',
+      });
+      let stderr = '';
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
       });
       child.on('close', (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`Command ${command} exited with code ${code}`));
+        else {
+          const err = new Error(stderr || `Command ${command} exited with code ${code}`);
+          (err as any).exitCode = code;
+          reject(err);
+        }
       });
       child.on('error', reject);
     });
