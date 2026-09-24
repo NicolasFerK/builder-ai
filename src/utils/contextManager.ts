@@ -23,35 +23,35 @@ export class ContextManager {
 
     // 1. PROJECT MEMORY
     if (project.projectMemory) {
-      prompt += `### PROJECT MEMORY\n${project.projectMemory}\n\n`;
+      prompt += `### PROJECT MEMORY\\n${project.projectMemory}\\n\\n`;
     }
 
     // 2. SESSION MEMORY
     if (project.currentSessionSummary) {
-      prompt += `### SESSION MEMORY\n${project.currentSessionSummary.content}\n\n`;
+      prompt += `### SESSION MEMORY\\n${project.currentSessionSummary.content}\\n\\n`;
     }
 
     // 3. CURRENT TASK
     if (project.currentTask) {
-      prompt += `### CURRENT TASK\n`;
-      prompt += `TITLE: ${project.currentTask.title}\n`;
-      prompt += `OBJECTIVE: ${project.currentTask.objective}\n`;
-      prompt += `CONSTRAINTS: ${project.currentTask.constraints}\n`;
-      prompt += `STATUS: ${project.currentTask.status}\n`;
+      prompt += `### CURRENT TASK\\n`;
+      prompt += `TITLE: ${project.currentTask.title}\\n`;
+      prompt += `OBJECTIVE: ${project.currentTask.objective}\\n`;
+      prompt += `CONSTRAINTS: ${project.currentTask.constraints}\\n`;
+      prompt += `STATUS: ${project.currentTask.status}\\n`;
       if (project.currentTask.files.length > 0) {
-        prompt += `RELEVANT FILES: ${project.currentTask.files.join(', ')}\n`;
+        prompt += `RELEVANT FILES: ${project.currentTask.files.join(', ')}\\n`;
       }
-      prompt += `\n`;
+      prompt += `\\n`;
     }
 
     // 4. CURRENT FILE STATE
     if (includeFileContents) {
       const relevantFiles = this.getRelevantFiles(project);
       if (relevantFiles.length > 0) {
-        prompt += `### CURRENT FILE STATE\n`;
+        prompt += `### CURRENT FILE STATE\\n`;
         relevantFiles.forEach(file => {
-          prompt += `--- File: ${file.name} ---\n`;
-          prompt += `${file.content || '[No content available]'}\n\n`;
+          prompt += `--- File: ${file.name} ---\\n`;
+          prompt += `${file.content || '[No content available]'}\\n\\n`;
         });
       }
     }
@@ -59,19 +59,46 @@ export class ContextManager {
     // 5. RECENT CONVERSATION
     const historyToUse = project.chatHistory.slice(-maxHistoryMessages);
     if (historyToUse.length > 0) {
-      prompt += `### RECENT CONVERSATION\n`;
+      prompt += `### RECENT CONVERSATION\\n`;
       historyToUse.forEach(m => {
-        prompt += `${m.role.toUpperCase()}: ${m.content}\n`;
+        prompt += `${m.role.toUpperCase()}: ${m.content}\\n`;
       });
-      prompt += `\n`;
+      prompt += `\\n`;
     }
 
     // 6. SYSTEM INSTRUCTIONS (The Rules)
-    prompt += `### INSTRUCTIONS\n`;
-    prompt += `1. SOURCE OF TRUTH: The current state of the files in the project is the absolute source of truth. If there is any conflict between memories (Project or Session) and the current code, the current code MUST prevail.\n`;
-    prompt += `2. USE CURRENT CONTENT: When performing tasks, always work with the most recent content of the files. Do not rely on code snippets found in the conversation history unless they are explicitly being proposed as changes.\n`;
-    prompt += `3. ARCHITECTURE: Respect the established project architecture and patterns found in PROJECT MEMORY.\n`;
-    prompt += `4. TASK FOCUS: Stay focused on the CURRENT TASK and its objectives.\n`;
+    prompt += `### INSTRUCTIONS\\n`;
+    prompt += `1. SOURCE OF TRUTH: The current state of the files in the project is the absolute source of truth. If there is any conflict between memories (Project or Session) and the current code, the current code MUST prevail.\\n`;
+    prompt += `2. USE CURRENT CONTENT: When performing tasks, always work with the most recent content of the files. Do not rely on code snippets found in the conversation history unless they are explicitly being proposed as changes.\\n`;
+    prompt += `3. ARCHITECTURE: Respect the established project architecture and patterns found in PROJECT MEMORY.\\n`;
+    prompt += `4. TASK FOCUS: Stay focused on the CURRENT TASK and its objectives.\\n`;
+    prompt += `\\n`;
+    prompt += `### FILE GENERATION & UPDATES\\n`;
+    prompt += `When the task asks to create or modify files, the model must generate the files directly.\\n`;
+    prompt += `Each file MUST be preceded exactly by:\\n\\n`;
+    prompt += `FILE: path/to/file.ext\\n\\n`;
+    prompt += `followed immediately by a Markdown code block containing the content of that file.\\n\\n`;
+    prompt += `Valid examples:\\n\\n`;
+    prompt += `FILE: package.json\\n\\n\`\`\`json\\n[JSON content]\\n\`\`\`\\n\\n`;
+    prompt += `FILE: src/main.jsx\\n\\n\`\`\`jsx\\n[Code content]\\n\`\`\`\\n\\n`;
+    prompt += `FILE: src/App.jsx\\n\\n\`\`\`jsx\\n[Code content]\\n\`\`\`\\n\\n`;
+    prompt += `\\n`;
+    prompt += `The path specified in FILE: must be the real path within the project.\\n`;
+    prompt += `It is mandatory to provide package.json when creating a project that requires it.\\n`;
+    prompt += `It is mandatory to provide all files necessary for the project to function.\\n`;
+    prompt += `DO NOT invent filenames.\\n`;
+    prompt += `DO NOT use README.md as a substitute for other files' code.\\n`;
+    prompt += `DO NOT put code from multiple files inside a single block.\\n`;
+    prompt += `DO NOT provide code without a corresponding FILE:.\\n`;
+    prompt += `DO NOT respond with tutorials.\\n`;
+    prompt += `DO NOT provide terminal commands like npm install, npm run dev, npm create vite, etc., when creating project files.\\n`;
+    prompt += `DO NOT tell the user to copy and paste files manually.\\n`;
+    prompt += `DO NOT explain step-by-step how to configure the project.\\n`;
+    prompt += `The response will be automatically processed by BuilderAI. Therefore, when the task involves creating or changing files, the priority is to directly produce the necessary files.\\n`;
+    prompt += `Short explanatory text can be used only when truly necessary, but it must never replace file generation.\\n`;
+    prompt += `Preserve existing files when the task is an update. Modify only what is necessary to fulfill the task.\\n`;
+    prompt += `Respect the existing project structure and technologies.\\n`;
+    prompt += `For a project creation task, generate a complete and executable structure, not just partial examples.\\n`;
 
     return {
       systemContext: prompt,
@@ -118,7 +145,7 @@ export class ContextManager {
     const taskTitle = project.currentTask?.title || 'Unknown Task';
     const filesModified = project.currentTask?.files?.join(', ') || 'Unknown';
 
-    return `Please generate a structured session summary for the current task: "${taskTitle}".\n\nYour summary should be divided into two distinct sections to help maintain context for future sessions.\n\n---\n\n# SESSION SUMMARY\n\n## 1. SESSION MEMORY (Transient Information)\n*This section is for things specific to this session that might not be relevant forever.*\n- **Objective**: What was the main goal of this specific session?\n- **Changes Made**: List the key changes and modifications.\n- **Files Modified**: ${filesModified}\n- **Current Progress**: What was actually achieved?\n- **Unresolved Issues**: Are there any bugs, half-finished features, or problems encountered?\n- **Next Steps**: What are the immediate next actions for the next session?\n\n## 2. PROJECT MEMORY (Permanent Knowledge)\n*This section is for information that MUST survive between sessions and shape the project's long-term evolution. Only include high-level, foundational information here.*\n- **Architectural Decisions**: Any new patterns, structures, or library choices made.\n- **Core Rules**: Any new coding standards or constraints discovered or established.\n- **Key Functionalities**: Important features that define how the system works.\n- **Project Structure**: Any significant changes to the project layout.\n\n---\n\n**IMPORTANT**: Be concise. Avoid re-stating obvious things. Focus on the "WHY" and "HOW" for Project Memory, and the "WHAT" and "NEXT" for Session Memory.\n`;
+    return `Please generate a structured session summary for the current task: \"${taskTitle}\".\\n\\nYour summary should be divided into two distinct sections to help maintain context for future sessions.\\n\\n---\\n\\n# SESSION SUMMARY\\n\\n## 1. SESSION MEMORY (Transient Information)\\n*This section is for things specific to this session that might not be relevant forever.*\\n- **Objective**: What was the main goal of this specific session?\\n- **Changes Made**: List the key changes and modifications.\\n- **Files Modified**: ${filesModified}\\n- **Current Progress**: What was actually achieved?\\n- **Unresolved Issues**: Are there any bugs, half-finished features, or problems encountered?\\n- **Next Steps**: What are the immediate next actions for the next session?\\n\\n## 2. PROJECT MEMORY (Permanent Knowledge)\\n*This section is for information that MUST survive between sessions and shape the project's long-term evolution. Only include high-level, foundational information here.*\\n- **Architectural Decisions**: Any new patterns, structures, or library choices made.\\n- **Core Rules**: Any new coding standards or constraints discovered or established.\\n- **Key Functionalities**: Important features that define how the system works.\\n- **Project Structure**: Any significant changes to the project layout.\\n\\n---\\n\\n**IMPORTANT**: Be concise. Avoid re-stating obvious things. Focus on the \"WHY\" and \"HOW\" for Project Memory, and the \"WHAT\" and \"NEXT\" for Session Memory.\\n`;
   }
 
   /**
