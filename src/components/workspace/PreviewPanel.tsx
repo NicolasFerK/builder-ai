@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
 import { Monitor, Smartphone, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
@@ -14,22 +13,56 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
   const { settings, updateSettings } = useSettings();
   const [isReloading, setIsReloading] = useState(false);
 
+  // Helper to find a file by name in the FileNode tree
+  const findFileByName = (nodes: FileNode[], name: string): FileNode | undefined => {
+    for (const node of nodes) {
+      if (node.name === name && node.type === 'file') {
+        return node;
+      }
+      if (node.type === 'folder' && node.children) {
+        const found = findFileByName(node.children, name);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
   // Helper to flatten FileNode tree to Sandpack format
-  const flattenFiles = (nodes: FileNode[], currentPath: string = ""): Record<string, { code: string }> => {
+  const flattenFiles = (nodes: FileNode[], currentPath: string = "", skipName?: string): Record<string, { code: string }> => {
     const result: Record<string, { code: string }> = {};
     for (const node of nodes) {
+      if (node.name === skipName) continue;
+
       // Sandpack paths usually start with /
       const newPath = currentPath === "" ? `/${node.name}` : `${currentPath}/${node.name}`;
       if (node.type === 'file') {
         result[newPath] = { code: node.content || "" };
       } else if (node.type === 'folder' && node.children) {
-        Object.assign(result, flattenFiles(node.children, newPath));
+        Object.assign(result, flattenFiles(node.children, newPath, skipName));
       }
     }
     return result;
   };
 
-  const sandpackFiles = flattenFiles(files);
+  // Extract dependencies from package.json
+  const getSandpackDependencies = () => {
+    const packageJsonNode = findFileByName(files, 'package.json');
+    if (packageJsonNode && packageJsonNode.content) {
+      try {
+        const packageJson = JSON.parse(packageJsonNode.content);
+        const dependencies = packageJson.dependencies;
+        if (dependencies && typeof dependencies === 'object') {
+          return dependencies as Record<string, string>;
+        }
+      } catch (error) {
+        console.error('Failed to parse package.json', error);
+      }
+    }
+    return { 'react': 'latest', 'react-dom': 'latest' };
+  };
+
+  const sandpackFiles = flattenFiles(files, "", "package.json");
+  const sandpackDependencies = getSandpackDependencies();
 
   const handleReload = () => {
     setIsReloading(true);
@@ -90,6 +123,7 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
           <SandpackProvider 
             template="vite-react" 
             files={sandpackFiles}
+            customSetup={{ dependencies: sandpackDependencies }}
           >
             <SandpackPreview 
               showOpenInCodeSandbox={false} 
