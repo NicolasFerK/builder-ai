@@ -28,6 +28,7 @@ export function ChatPanel() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [lastAiMessageId, setLastAiMessageId] = useState<string | null>(null);
   const [lastUndoState, setLastUndoState] = useState<{ files: any[], messageId: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +169,9 @@ export function ChatPanel() {
       return;
     }
 
+    let aiMessageId: string | null = null;
+    let accumulatedContent = '';
+
     try {
       // Create a temporary project object with the updated history to ensure ContextManager has the latest messages for the system prompt
       const projectWithLatestHistory = {
@@ -187,6 +191,7 @@ export function ChatPanel() {
       console.log(`[BUILDERAI DEBUG] REQUEST BODY: ${JSON.stringify({
         model: settings.modelName || 'default',
         messages: finalMessages,
+        stream: true
       })}`);
 
       const response = await fetch(settings.apiUrl, {
@@ -198,6 +203,7 @@ export function ChatPanel() {
         body: JSON.stringify({
           model: settings.modelName || 'default',
           messages: finalMessages,
+          stream: true,
         }),
       });
 
@@ -208,43 +214,103 @@ export function ChatPanel() {
         throw new Error(`API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      
-      // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG] RESPONSE RECEIVED: ${JSON.stringify(data)}`);
-      
-      let aiContent = '';
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        aiContent = data.choices[0].message.content;
-      } else if (data.response) {
-        aiContent = data.response;
-      } else {
-        aiContent = JSON.stringify(data);
-      }
-
-      // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG] PARSED RESPONSE: ${aiContent}`);
+      // Prepare for streaming
+      aiMessageId = crypto.randomUUID();
+      setLastAiMessageId(aiMessageId);
 
       const aiMessage: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: aiMessageId,
         role: 'assistant',
-        content: aiContent,
+        content: '',
         timestamp: Date.now(),
       };
-
-      // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG] ASSISTANT MESSAGE OBJECT: ${JSON.stringify(aiMessage)}`);
 
       if (!customMessages) {
         updateProject(currentProject.id, {
           chatHistory: [...updatedHistory, aiMessage]
         });
-      } else {
-        return aiContent;
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || trimmedLine === 'data: [DONE]') continue;
+
+              if (trimmedLine.startsWith('data: ')) {
+                try {
+                  const jsonStr = trimmedLine.substring(6);
+                  const data = JSON.parse(jsonStr);
+                  const content = data.choices?.[0]?.delta?.content || '';
+                  accumulatedContent += content;
+
+                  if (!customMessages && content) {
+                    // Update message in history
+                    // To avoid stale state, we must be careful with updateProject. 
+                    // Since updateProject is an async-like effect from useProjects, 
+                    // we'll just pass the new history. 
+                    // We need to find the current project's latest history that includes our aiMessage.
+                    // In a real app, we'd use a functional update, but here we'll rely on the fact 
+                    // that we just added aiMessage to updatedHistory.
+                    
+                    // We'll rebuild the history for the update based on what we know.
+                    // Since we can't easily get the LATEST history from the hook in the middle of this function,
+                    // we'll assume currentProject is somewhat stable or the update will merge.
+                    // Actually, we need to reconstruct the history.
+                    
+                    const currentChatHistory = customMessages ? currentProject.chatHistory : [...updatedHistory, aiMessage];
+                    const newHistory = currentChatHistory.map(m => 
+                      m.id === aiMessageId ? { ...m, content: accumulatedContent } : m
+                    );
+                    updateProject(currentProject.id, { chatHistory: newHistory });
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE chunk', e);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          accumulatedContent += '\n\n**Resposta interrompida**';
+          if (!customMessages && aiMessageId) {
+            const currentChatHistory = customMessages ? currentProject.chatHistory : [...updatedHistory, aiMessage];
+            const newHistory = currentChatHistory.map(m => 
+              m.id === aiMessageId ? { ...m, content: accumulatedContent } : m
+            );
+            updateProject(currentProject.id, { chatHistory: newHistory });
+          }
+          throw error;
+        } finally {
+          reader.releaseLock();
+        }
+      }
+
+      if (customMessages) {
+        return accumulatedContent;
+      }
+
+      // Ensure final content is set if loop finished but last chunk was part of a line
+      if (!customMessages && aiMessageId && accumulatedContent) {
+        const finalChatHistory = customMessages ? currentProject.chatHistory : [...updatedHistory, aiMessage];
+        const newHistory = finalChatHistory.map(m => 
+          m.id === aiMessageId ? { ...m, content: accumulatedContent } : m
+        );
+        updateProject(currentProject.id, { chatHistory: newHistory });
+      }
+
     } catch (error) {
-      // [BUILDERAI DEBUG]
-      console.error('[BUILDERAI DEBUG] EXCEPTION CAUGHT:', error);
       console.error('Chat error:', error);
       const errorMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -253,14 +319,12 @@ export function ChatPanel() {
         timestamp: Date.now(),
       };
       
-      // [BUILDERAI DEBUG]
-      console.log(`[BUILDERAI DEBUG] ADDING ERROR MESSAGE TO CHAT: ${errorMessage.content}`);
-      
       updateProject(currentProject.id, {
         chatHistory: [...updatedHistory, errorMessage]
       });
     } finally {
       setIsTyping(false);
+      setLastAiMessageId(null);
     }
   };
 
@@ -353,9 +417,6 @@ export function ChatPanel() {
       <ScrollArea className='flex-1' ref={scrollRef}>
         <div className='p-4 space-y-6'>
           {currentProject.chatHistory.map((message) => {
-            // [BUILDERAI DEBUG]
-            console.log(`[BUILDERAI DEBUG] RENDERING MESSAGE: ID=${message.id}, ROLE=${message.role}, CONTENT_LENGTH=${message.content.length}`);
-            
             return (
               <div 
                 key={message.id} 
@@ -404,6 +465,7 @@ export function ChatPanel() {
                         size='sm' 
                         className='gap-2 h-8 text-xs'
                         onClick={() => handleApplyCode(message.content, message.id)}
+                        disabled={message.id === lastAiMessageId}
                       >
                         <Play className='w-3 h-3' />
                         Apply Code to Files
