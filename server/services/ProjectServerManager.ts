@@ -22,6 +22,21 @@ class ProjectServerManager {
   private projects: Map<string, ProjectInfo> = new Map();
   private readonly projectsRoot = path.join(process.cwd(), 'projects');
 
+  async getPackageManager(projectPath: string): Promise<string> {
+    try {
+      const files = await fs.readdir(projectPath);
+      if (files.includes('pnpm-lock.yaml')) {
+        return 'pnpm';
+      }
+      if (files.includes('yarn.lock')) {
+        return 'yarn';
+      }
+      return 'npm';
+    } catch (e) {
+      return 'npm';
+    }
+  }
+
   async start(projectId: string): Promise<ProjectInfo> {
     if (this.projects.has(projectId)) {
       const existing = this.projects.get(projectId)!;
@@ -60,31 +75,36 @@ class ProjectServerManager {
     this.projects.set(projectId, info);
 
     try {
+      const pkgManager = await this.getPackageManager(projectPath);
       const nodeModulesPath = path.join(projectPath, 'node_modules');
       
       try {
         await fs.access(nodeModulesPath);
       } catch {
-        console.log(`[PREVIEW] node_modules not found, installing dependencies in ${projectPath}...`);
-        console.log('[PREVIEW-DEBUG] npm install started');
+        console.log(`[PREVIEW] node_modules not found, installing dependencies with ${pkgManager} in ${projectPath}...`);
+        console.log('[PREVIEW-DEBUG] install started');
         try {
-          await this.runCommandWithOutput('npm', ['install'], projectPath);
+          await this.runCommandWithOutput(pkgManager, ['install'], projectPath);
           info.npmInstallExitCode = 0;
-          console.log('[PREVIEW-DEBUG] npm install exit code', 0);
+          console.log('[PREVIEW-DEBUG] install exit code', 0);
         } catch (err: any) {
           info.npmInstallError = err.message;
           info.npmInstallExitCode = err.exitCode ?? -1;
-          console.error('[PREVIEW-DEBUG] npm install error', err.message);
+          console.error('[PREVIEW-DEBUG] install error', err.message);
           throw err;
         }
       }
 
-      console.log(`[PREVIEW] starting dev server on port: ${port}`);
+      console.log(`[PREVIEW] starting dev server with ${pkgManager} on port: ${port}`);
       console.log('[PREVIEW-DEBUG] projectId', projectId);
       console.log('[PREVIEW-DEBUG] projectPath', projectPath);
-      console.log('[PREVIEW-DEBUG] npm run dev started');
+      console.log('[PREVIEW-DEBUG] dev server started');
 
-      const child = spawn('npm', ['run', 'dev', '--', '--port', port.toString(), '--host', '0.0.0.0'], {
+      const devArgs = pkgManager === 'npm' || pkgManager === 'pnpm'
+        ? ['run', 'dev', '--', '--port', port.toString(), '--host', '0.0.0.0']
+        : ['run', 'dev', '--port', port.toString(), '--host', '0.0.0.0'];
+
+      const child = spawn(pkgManager, devArgs, {
         cwd: projectPath,
         shell: true,
         stdio: ['ignore', 'pipe', 'pipe'],
