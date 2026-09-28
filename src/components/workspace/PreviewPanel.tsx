@@ -1,92 +1,87 @@
-import React, { useState } from 'react';
-import { Monitor, Smartphone, RefreshCw, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Monitor, Smartphone, RefreshCw, Loader2, Play, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
-import { FileNode } from '@/types';
-import { SandpackProvider, SandpackPreview } from '@codesandbox/sandpack-react';
 
 interface PreviewPanelProps {
-  files: FileNode[];
+  projectId: string;
 }
 
-export function PreviewPanel({ files }: PreviewPanelProps) {
+type PreviewStatus = 'running' | 'starting' | 'stopped' | 'error' | 'not_found';
+
+export function PreviewPanel({ projectId }: PreviewPanelProps) {
   const { settings, updateSettings } = useSettings();
   const [isReloading, setIsReloading] = useState(false);
+  const [status, setStatus] = useState<PreviewStatus>('not_found');
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Helper to find a file by name in the FileNode tree
-  const findFileByName = (nodes: FileNode[], name: string): FileNode | undefined => {
-    for (const node of nodes) {
-      if (node.name === name && node.type === 'file') {
-        return node;
+  const fetchPreviewStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/get-preview-url?projectId=${projectId}`);
+      const data = await response.json();
+
+      if (data.status === 'not_found') {
+        setStatus('not_found');
+      } else {
+        setUrl(data.url || null);
+        setStatus(data.status);
+        if (data.diagnostics?.error) {
+          setError(data.diagnostics.error);
+        } else {
+          setError(null);
+        }
       }
-      if (node.type === 'folder' && node.children) {
-        const found = findFileByName(node.children, name);
-        if (found) return found;
-      }
+    } catch (err) {
+      console.error('Failed to fetch preview status', err);
+      setStatus('error');
+      setError('Failed to connect to preview service');
     }
-    return undefined;
+  }, [projectId]);
+
+  const startPreview = async () => {
+    setStatus('starting');
+    try {
+      const response = await fetch('/api/start-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUrl(data.url);
+        setStatus(data.status);
+      } else {
+        throw new Error(data.error || 'Failed to start preview');
+      }
+    } catch (err: any) {
+      console.error('Failed to start preview', err);
+      setStatus('error');
+      setError(err.message || 'Failed to start preview');
+    }
   };
 
-  // Helper to flatten FileNode tree to Sandpack format
-  const flattenFiles = (nodes: FileNode[], currentPath: string = "", skipName?: string): Record<string, { code: string }> => {
-    const result: Record<string, { code: string }> = {};
-    for (const node of nodes) {
-      if (node.name === skipName) continue;
-
-      // Sandpack paths usually start with /
-      const newPath = currentPath === "" ? `/${node.name}` : `${currentPath}/${node.name}`;
-      if (node.type === 'file') {
-        result[newPath] = { code: node.content || "" };
-      } else if (node.type === 'folder' && node.children) {
-        Object.assign(result, flattenFiles(node.children, newPath, skipName));
-      }
-    }
-    return result;
-  };
-
-  // Extract dependencies from package.json
-  const { dependencies, devDependencies } = React.useMemo(() => {
-    const packageJsonNode = findFileByName(files, 'package.json');
-    if (packageJsonNode && packageJsonNode.content) {
-      try {
-        const packageJson = JSON.parse(packageJsonNode.content);
-        const dependencies = packageJson.dependencies || {};
-        const devDependencies = packageJson.devDependencies || {};
-
-        const filteredDevDependencies = Object.fromEntries(
-          Object.entries(devDependencies).filter(([pkg]) =>
-            pkg !== 'vite' &&
-            !pkg.startsWith('@vitejs/plugin-react') &&
-            !pkg.startsWith('@types/')
-          )
-        );
-
-        return {
-          dependencies: dependencies as Record<string, string>,
-          devDependencies: filteredDevDependencies as Record<string, string>,
-        };
-      } catch (error) {
-        console.error('Failed to parse package.json', error);
-      }
-    }
-    return {
-      dependencies: { 'react': 'latest', 'react-dom': 'latest' },
-      devDependencies: {}
-    };
-  }, [files]);
-
-  const sandpackFiles = React.useMemo(() => flattenFiles(files, "", "package.json"), [files]);
+  useEffect(() => {
+    fetchPreviewStatus();
+    const interval = setInterval(fetchPreviewStatus, 3000);
+    return () => clearInterval(interval);
+  }, [fetchPreviewStatus]);
 
   const handleReload = () => {
     setIsReloading(true);
-    // Sandpack handles its own refreshing, but we can provide a visual cue
-    setTimeout(() => setIsReloading(false), 500);
+    // For iframe, we just reload the iframe
+    // We can also re-fetch status just in case
+    fetchPreviewStatus().finally(() => {
+      setTimeout(() => setIsReloading(false), 500);
+    });
   };
 
-  if (files.length === 0) {
+  if (status === 'not_found' && !url) {
     return (
-      <div className='flex items-center justify-center h-full text-muted-foreground'>
-        Nenhum arquivo para pré-visualizar.
+      <div className='flex flex-col items-center justify-center h-full text-muted-foreground gap-4'>
+        <Play className='w-12 h-12 opacity-20' />
+        <p>No project selected or preview not initialized.</p>
+        <Button onClick={startPreview}>Start Preview</Button>
       </div>
     );
   }
@@ -96,6 +91,12 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
       <div className='p-2 border-b flex items-center justify-between bg-background'>
         <div className='flex items-center gap-2'>
           <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
+          {status === 'running' && (
+            <span className='text-[10px] text-green-500 font-bold animate-pulse'>● LIVE</span>
+          )}
+          {status === 'starting' && (
+            <span className='text-[10px] text-amber-500 font-bold animate-pulse'>● STARTING</span>
+          )}
         </div>
         <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
           <Button 
@@ -120,7 +121,7 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
             size='icon' 
             className='h-7 w-7'
             onClick={handleReload}
-            disabled={isReloading}
+            disabled={isReloading || status !== 'running'}
           >
             {isReloading ? <Loader2 className='w-4 h-4 animate-spin' /> : <RefreshCw className='w-4 h-4' />}
           </Button>
@@ -133,18 +134,47 @@ export function PreviewPanel({ files }: PreviewPanelProps) {
             ? 'w-[375px] h-[667px]' 
             : 'w-full h-full max-w-5xl'
         }`}>
-          <SandpackProvider
-            template="vite-react"
-            files={sandpackFiles}
-            customSetup={{ dependencies, devDependencies }}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <SandpackPreview
-              showOpenInCodeSandbox={false}
-              showRefreshButton
-              style={{ height: '100%', width: '100%' }}
+          {status === 'running' && url ? (
+            <iframe 
+              src={url} 
+              className='w-full h-full border-none'
+              title="Project Preview"
             />
-          </SandpackProvider>
+          ) : status === 'starting' ? (
+            <div className='flex flex-col items-center justify-center h-full gap-4'>
+              <Loader2 className='w-12 h-12 animate-spin text-primary' />
+              <p className='text-sm text-muted-foreground'>Starting development server...</p>
+            </div>
+          ) : (
+            <div className='flex flex-col items-center justify-center h-full gap-4 p-8 text-center'>
+              {status === 'error' && (
+                <>
+                  <AlertCircle className='w-12 h-12 text-destructive opacity-50' />
+                  <div className='space-y-2'>
+                    <h3 className='font-semibold text-lg'>Preview Error</h3>
+                    <p className='text-sm text-muted-foreground max-w-xs'>
+                      {error || 'The development server encountered an error and stopped.'}
+                    </p>
+                  </div>
+                </>
+              )}
+              {status === 'stopped' && (
+                <>
+                  <Play className='w-12 h-12 text-primary opacity-50' />
+                  <p className='text-sm text-muted-foreground'>The preview server is stopped.</p>
+                </>
+              )}
+              {status === 'not_found' && (
+                <>
+                  <AlertCircle className='w-12 h-12 text-muted-foreground opacity-50' />
+                  <p className='text-sm text-muted-foreground'>No active preview found.</p>
+                </>
+              )}
+              <Button onClick={startPreview} className='mt-2'>
+                {status === 'error' ? 'Retry Starting' : 'Start Preview'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

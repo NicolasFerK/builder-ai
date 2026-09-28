@@ -38,7 +38,7 @@ class ProjectServerManager {
       console.error(`[PREVIEW] Failed to create directory ${projectPath}`, e);
     }
 
-    const port = await this.findFreePort(5174);
+    const port = await this.findFreePort(5173);
     console.log('[PREVIEW-DEBUG] selected port', port);
     const url = `http://localhost:${port}`;
 
@@ -56,26 +56,13 @@ class ProjectServerManager {
       processExitCode: null,
       error: null,
     };
-
-    this.projects.set(projectId, info);
-
-    try {
-      console.log(`[PREVIEW] projectId: ${projectId}`);
-      console.log(`[PREVIEW] projectRoot: ${projectPath}`);
+// ... (skipping lines)
       console.log(`[PREVIEW] starting dev server on port: ${port}`);
       console.log('[PREVIEW-DEBUG] projectId', projectId);
       console.log('[PREVIEW-DEBUG] projectPath', projectPath);
 
       // Check if node_modules exists
-      const nodeModulesPath = path.join(projectPath, 'node_modules');
-      const packageJsonPath = path.join(projectPath, 'package.json');
-      try {
-        await fs.access(packageJsonPath);
-        console.log('[PREVIEW-DEBUG] package.json exists');
-      } catch {
-        console.log('[PREVIEW-DEBUG] package.json does NOT exist');
-      }
-
+// ... (skipping lines)
       try {
         await fs.access(nodeModulesPath);
       } catch {
@@ -94,13 +81,14 @@ class ProjectServerManager {
       }
 
       console.log('[PREVIEW-DEBUG] npm run dev started');
-      const child = spawn('npm', ['run', 'dev', '--', '--port', port.toString()], {
+      const child = spawn('npm', ['run', 'dev', '--', '--port', port.toString(), '--host', '0.0.0.0'], {
         cwd: projectPath,
         shell: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       info.process = child;
+// ... (skipping lines)
 
       child.stdout?.on('data', (data) => {
         const output = data.toString();

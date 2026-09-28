@@ -102,7 +102,7 @@ export default function ProjectWorkspace() {
                   </div>
                 </div>
                 <TabsContent value='preview' className='flex-1 m-0 overflow-hidden'>
-                  <PreviewPanel files={currentProject.files || []} />
+                  <PreviewPanel projectId={projectId} />
                 </TabsContent>
                 <TabsContent value='code' className='flex-1 m-0 overflow-hidden'>
                   <CodePanel 
