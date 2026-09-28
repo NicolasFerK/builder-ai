@@ -19,6 +19,21 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const statusRef = useRef<PreviewStatus>('loading');
+  const isMountedRef = useRef<boolean>(true);
+
+  // Sync status ref with state for stable callbacks
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  // Handle mounting/unmounting
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -35,6 +50,8 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
       }
       
       const data = await response.json();
+
+      if (!isMountedRef.current) return;
 
       if (data.status === 'not_found') {
         setStatus('error');
@@ -57,16 +74,19 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
     } catch (err: any) {
       console.error('[PREVIEW] Polling error:', err);
       // If we are already running, don't let a polling error crash the UI
-      if (status !== 'running') {
+      if (isMountedRef.current && statusRef.current !== 'running') {
         setStatus('error');
         setError(err.message);
         stopPolling();
       }
     }
-  }, [projectId, status, stopPolling]);
+  }, [projectId, stopPolling]); // Removed 'status' from dependencies
 
   const startPreview = useCallback(async () => {
     stopPolling();
+    
+    if (!isMountedRef.current) return;
+
     setStatus('loading');
     setError(null);
     setUrl(null);
@@ -78,6 +98,8 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
         body: JSON.stringify({ projectId }),
       });
 
+      if (!isMountedRef.current) return;
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.statusMessage || `Failed to start preview: ${response.statusText}`);
@@ -85,10 +107,17 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
 
       const data = await response.json();
       
+      if (!isMountedRef.current) return;
+
       if (data.success) {
         if (data.status === 'running') {
           setUrl(data.url);
           setStatus('running');
+        } else if (data.status === 'error') {
+          // Handle error immediately to avoid unnecessary polling
+          setStatus('error');
+          setError(data.diagnostics?.npmRunDevError || data.diagnostics?.npmInstallError || 'Failed to start development server.');
+          stopPolling();
         } else {
           setStatus('starting');
           // Start polling to wait for 'running' status
@@ -99,10 +128,12 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
       }
     } catch (err: any) {
       console.error('[PREVIEW] Start error:', err);
-      setStatus('error');
-      setError(err.message);
+      if (isMountedRef.current) {
+        setStatus('error');
+        setError(err.message);
+      }
     }
-  }, [projectId, stopPolling, checkStatus]);
+  }, [projectId, stopPolling, checkStatus]); // All dependencies are now stable
 
   useEffect(() => {
     startPreview();
@@ -110,7 +141,7 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
     return () => {
       stopPolling();
     };
-  }, [startPreview, stopPolling, refreshKey]); // refreshKey added to trigger re-mount/re-start
+  }, [startPreview, stopPolling, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
