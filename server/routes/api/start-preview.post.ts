@@ -1,5 +1,6 @@
-import { defineEventHandler, readBody, createError } from 'h3';
-import { projectServerManager } from '../services/ProjectServerManager';
+import { defineEventHandler } from "nitro";
+import { readBody, createError } from "nitro/h3";
+import { projectServerManager } from '../../services/ProjectServerManager';
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);

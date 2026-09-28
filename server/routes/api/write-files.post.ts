@@ -1,4 +1,5 @@
-import { defineEventHandler, readBody, createError } from 'h3';
+import { defineEventHandler } from "nitro";
+import { readBody, createError } from "nitro/h3";
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
   try {
     for (const file of files) {
       // Prevent path traversal
-      const sanitizedPath = path.normalize(file.path).replace(/^(\\.\\.(\\/|\\\\|$))+/, '');
+      const sanitizedPath = path.normalize(file.path).replace(/^(\\\.\\.(\/|\\|$))+/, '');
       const filePath = path.join(projectDir, sanitizedPath);
       
       // Double check that the filePath is still within projectDir
