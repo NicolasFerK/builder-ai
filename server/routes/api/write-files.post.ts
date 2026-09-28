@@ -1,9 +1,9 @@
-import { defineEventHandler } from "nitro";
+import { defineHandler } from "nitro";
 import { readBody, createError } from "nitro/h3";
 import fs from 'fs/promises';
 import path from 'path';
 
-export default defineEventHandler(async (event) => {
+export default defineHandler(async (event) => {
   const body = await readBody(event);
   const { files, projectId } = body;
 

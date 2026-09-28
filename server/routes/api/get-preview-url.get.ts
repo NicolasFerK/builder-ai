@@ -1,8 +1,8 @@
-import { defineEventHandler } from "nitro";
+import { defineHandler } from "nitro";
 import { getQuery, createError } from "nitro/h3";
 import { projectServerManager } from '../../services/ProjectServerManager';
 
-export default defineEventHandler(async (event) => {
+export default defineHandler(async (event) => {
   const query = getQuery(event);
   const projectId = query.projectId as string;
 
