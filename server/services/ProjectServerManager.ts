@@ -56,13 +56,12 @@ class ProjectServerManager {
       processExitCode: null,
       error: null,
     };
-// ... (skipping lines)
-      console.log(`[PREVIEW] starting dev server on port: ${port}`);
-      console.log('[PREVIEW-DEBUG] projectId', projectId);
-      console.log('[PREVIEW-DEBUG] projectPath', projectPath);
 
-      // Check if node_modules exists
-// ... (skipping lines)
+    this.projects.set(projectId, info);
+
+    try {
+      const nodeModulesPath = path.join(projectPath, 'node_modules');
+      
       try {
         await fs.access(nodeModulesPath);
       } catch {
@@ -80,7 +79,11 @@ class ProjectServerManager {
         }
       }
 
+      console.log(`[PREVIEW] starting dev server on port: ${port}`);
+      console.log('[PREVIEW-DEBUG] projectId', projectId);
+      console.log('[PREVIEW-DEBUG] projectPath', projectPath);
       console.log('[PREVIEW-DEBUG] npm run dev started');
+
       const child = spawn('npm', ['run', 'dev', '--', '--port', port.toString(), '--host', '0.0.0.0'], {
         cwd: projectPath,
         shell: true,
@@ -88,7 +91,6 @@ class ProjectServerManager {
       });
 
       info.process = child;
-// ... (skipping lines)
 
       child.stdout?.on('data', (data) => {
         const output = data.toString();
@@ -125,10 +127,6 @@ class ProjectServerManager {
         console.log('[PREVIEW-DEBUG] process exit', code);
         info.processExitCode = code;
         info.status = code === 0 ? 'stopped' : 'error';
-        if (code !== 0 && !info.npmRunDevError) {
-           // If it's not a clean stop, and we don't have a specific error, maybe it's a crash
-           // But we'll let stderr capture it if possible
-        }
         console.log('[PREVIEW-DEBUG] server status', info.status);
         info.process = null;
       });
