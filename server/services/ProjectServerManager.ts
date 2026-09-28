@@ -98,7 +98,8 @@ class ProjectServerManager {
 
     const port = await this.findFreePort(5173);
     console.log('[PREVIEW-DEBUG] selected port', port);
-    const url = `http://localhost:${port}`;
+    const url = `http://127.0.0.1:${port}`;
+    console.log('[PREVIEW-DEBUG] generated url', url);
 
     const info: ProjectInfo = {
       process: null,
