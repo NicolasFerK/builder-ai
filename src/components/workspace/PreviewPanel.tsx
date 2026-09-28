@@ -1,93 +1,127 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Monitor, Smartphone, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Monitor, Smartphone, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
 import { FileNode } from '@/types';
-import { SandpackProvider, SandpackPreview } from '@codesandbox/sandpack-react';
 
 interface PreviewPanelProps {
   projectId: string;
-  files: FileNode[];
+  files: FileNode[]; // Kept for interface compatibility, though not used for iframe content
 }
 
-export function PreviewPanel({ files: projectFiles }: PreviewPanelProps) {
-  const { settings, updateSettings } = useSettings();
-  const [packageJson, setPackageJson] = useState<any>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+type PreviewStatus = 'loading' | 'starting' | 'running' | 'error';
 
-  useEffect(() => {
-    fetch('/package.json')
-      .then(res => res.json())
-      .then(data => setPackageJson(data))
-      .catch(err => console.error('[PREVIEW] Failed to fetch package.json:', err));
+export function PreviewPanel({ projectId }: PreviewPanelProps) {
+  const { settings, updateSettings } = useSettings();
+  const [status, setStatus] = useState<PreviewStatus>('loading');
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
   }, []);
 
-  const sandpackFiles = useMemo(() => {
-    const buildFiles = (nodes: FileNode[], currentPath = ""): Record<string, string> => {
-      let files: Record<string, string> = {};
-      for (const node of nodes) {
-        const path = `${currentPath}/${node.name}`;
-        if (node.type === 'file' && node.content) {
-          files[path] = node.content;
-        } else if (node.type === 'folder' && node.children) {
-          Object.assign(files, buildFiles(node.children, path));
-        }
+  const checkStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/get-preview-url?projectId=${projectId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch status: ${response.statusText}`);
       }
-      return files;
-    };
+      
+      const data = await response.json();
 
-    return buildFiles(projectFiles);
-  }, [projectFiles]);
-
-  const customSetup = useMemo(() => {
-    if (!packageJson) return undefined;
-
-    const dependencies = { ...packageJson.dependencies };
-    const devDependencies = { ...packageJson.devDependencies };
-
-    // Filter devDependencies
-    Object.keys(devDependencies).forEach(key => {
-      if (
-        key === 'vite' || 
-        key === '@vitejs/plugin-react-swc' || 
-        key.startsWith('@vitejs/plugin-react') || 
-        key.startsWith('@types/')
-      ) {
-        delete devDependencies[key];
+      if (data.status === 'not_found') {
+        setStatus('error');
+        setError('Project not found on server.');
+        stopPolling();
+        return;
       }
-    });
 
-    return {
-      dependencies: {
-        ...dependencies,
-        ...devDependencies
+      if (data.status === 'running') {
+        setUrl(data.url);
+        setStatus('running');
+        stopPolling();
+      } else if (data.status === 'error') {
+        setStatus('error');
+        setError(data.diagnostics?.npmRunDevError || data.diagnostics?.npmInstallError || 'Failed to start development server.');
+        stopPolling();
+      } else if (data.status === 'starting') {
+        setStatus('starting');
       }
-    };
-  }, [packageJson]);
-
-  // Fallback dependencies if package.json is not loaded
-  const fallbackSetup = useMemo(() => ({
-    dependencies: {
-      react: '^18.2.0',
-      'react-dom': '^18.2.0'
+    } catch (err: any) {
+      console.error('[PREVIEW] Polling error:', err);
+      // If we are already running, don't let a polling error crash the UI
+      if (status !== 'running') {
+        setStatus('error');
+        setError(err.message);
+        stopPolling();
+      }
     }
-  }), []);
+  }, [projectId, status, stopPolling]);
 
-  if (projectFiles.length === 0) {
-    return (
-      <div className='flex flex-col items-center justify-center h-full text-muted-foreground gap-4'>
-        <RefreshCw className='w-12 h-12 opacity-20' />
-        <p>Nenhum arquivo para pré-visualizar.</p>
-      </div >
-    );
-  }
+  const startPreview = useCallback(async () => {
+    stopPolling();
+    setStatus('loading');
+    setError(null);
+    setUrl(null);
+
+    try {
+      const response = await fetch('/api/start-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.statusMessage || `Failed to start preview: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        if (data.status === 'running') {
+          setUrl(data.url);
+          setStatus('running');
+        } else {
+          setStatus('starting');
+          // Start polling to wait for 'running' status
+          pollingRef.current = setInterval(checkStatus, 2000);
+        }
+      } else {
+        throw new Error('Failed to initiate preview start.');
+      }
+    } catch (err: any) {
+      console.error('[PREVIEW] Start error:', err);
+      setStatus('error');
+      setError(err.message);
+    }
+  }, [projectId, stopPolling, checkStatus]);
+
+  useEffect(() => {
+    startPreview();
+
+    return () => {
+      stopPolling();
+    };
+  }, [startPreview, stopPolling, refreshKey]); // refreshKey added to trigger re-mount/re-start
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   return (
     <div className='flex flex-col h-full bg-muted/30'>
       <div className='p-2 border-b flex items-center justify-between bg-background'>
         <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span >
-        </div >
+          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
+        </div>
         <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
           <Button 
             variant={settings.viewMode === 'desktop' ? 'secondary' : 'ghost'} 
@@ -110,12 +144,13 @@ export function PreviewPanel({ files: projectFiles }: PreviewPanelProps) {
             variant='ghost' 
             size='icon' 
             className='h-7 w-7'
-            onClick={() => setRefreshKey(prev => prev + 1)}
+            onClick={handleRefresh}
+            disabled={status === 'loading' || status === 'starting'}
           >
-            <RefreshCw className='w-4 h-4' />
+            <RefreshCw className={`h-4 w-4 ${status === 'starting' ? 'animate-spin' : ''}`} />
           </Button>
-        </div >
-      </div >
+        </div>
+      </div>
       
       <div className='flex-1 flex items-center justify-center p-4 bg-slate-100 overflow-hidden relative'>
         <div className={`shadow-2xl rounded-lg overflow-hidden bg-white transition-all duration-300 ${
@@ -123,21 +158,44 @@ export function PreviewPanel({ files: projectFiles }: PreviewPanelProps) {
             ? 'w-[375px] h-[667px]' 
             : 'w-full h-full max-w-5xl'
         }`}>
-          <SandpackProvider
-            key={refreshKey}
-            template="vite-react"
-            files={sandpackFiles}
-            customSetup={packageJson ? customSetup : fallbackSetup}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <SandpackPreview
-              showOpenInCodeSandbox={false}
-              showRefreshButton={true}
-              style={{ height: '100%', width: '100%' }}
+          {status === 'loading' || status === 'starting' ? (
+            <div className='w-full h-full flex flex-col items-center justify-center gap-4 text-muted-foreground'>
+              <Loader2 className='w-12 h-12 animate-spin opacity-20' />
+              <div className='text-center'>
+                <p className='font-medium text-foreground'>{status === 'loading' ? 'Initializing...' : 'Starting Dev Server...'}</p>
+                <p className='text-sm'>This may take a moment for the first run.</p>
+              </div>
+            </div>
+          ) : status === 'error' ? (
+            <div className='w-full h-full flex flex-col items-center justify-center gap-4 p-6 text-center'>
+              <div className='w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center'>
+                <AlertCircle className='w-8 h-8 text-destructive' />
+              </div>
+              <div className='max-w-sm'>
+                <h3 className='text-lg font-semibold text-foreground'>Preview Failed</h3>
+                <p className='text-sm text-muted-foreground mt-2 whitespace-pre-wrap'>
+                  {error || 'An unknown error occurred while starting the preview.'}
+                </p>
+              </div>
+              <Button onClick={handleRefresh} variant='default' className='mt-2'>
+                Try Again
+              </Button>
+            </div>
+          ) : url ? (
+            <iframe
+              src={url}
+              className='w-full h-full border-none'
+              title="App Preview"
+              sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"
             />
-          </SandpackProvider>
-        </div >
-      </div >
-    </div >
+          ) : (
+            <div className='w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-4'>
+              <RefreshCw className='w-12 h-12 opacity-20' />
+              <p>Nenhum arquivo para pré-visualizar.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
