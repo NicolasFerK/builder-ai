@@ -44,7 +44,7 @@ export function useProjects() {
   };
 
   const updateProject = async (projectId: string, updates: Partial<Project>) => {
-    console.log(`[REAL-APPLY] UPDATE PROJECT FILES: ${JSON.stringify(updates.files?.map(f => f.path))}`);
+    console.log(`[REAL-APPLY] UPDATE PROJECT FILES: ${JSON.stringify(updates.files?.map(f => f.name))}`);
     const updatedProjects = projects.map((p) =>
       p.id === projectId ? { ...p, ...updates, lastModified: Date.now() } : p
     );
