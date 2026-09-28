@@ -17,10 +17,30 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchPreviewStatus = useCallback(async () => {
+    if (!projectId) {
+      console.warn('[PREVIEW] fetchPreviewStatus called without projectId');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/get-preview-url?projectId=${projectId}`);
-      const data = await response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[PREVIEW] fetchPreviewStatus error (status ${response.status}): ${errorText}`);
+        setStatus('error');
+        setError(`Server error: ${response.status}`);
+        return;
+      }
 
+      const text = await response.text();
+      if (!text) {
+        console.warn('[PREVIEW] fetchPreviewStatus returned empty response');
+        return;
+      }
+
+      const data = JSON.parse(text);
+      
       if (data.status === 'not_found') {
         setStatus('not_found');
       } else {
@@ -33,13 +53,19 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch preview status', err);
+      console.error('[PREVIEW] fetchPreviewStatus exception:', err);
       setStatus('error');
       setError('Failed to connect to preview service');
     }
   }, [projectId]);
 
+
   const startPreview = async () => {
+    if (!projectId) {
+      setError('Project ID is missing');
+      return;
+    }
+
     setStatus('starting');
     try {
       const response = await fetch('/api/start-preview', {
@@ -47,15 +73,27 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId }),
       });
-      const data = await response.json();
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Server responded with ${response.status}`);
+      }
+
+      const text = await response.text();
+      if (!text) {
+        throw new Error('Server returned an empty response');
+      }
+
+      const data = JSON.parse(text);
       if (data.success) {
+// ... (skipping lines)
         setUrl(data.url);
         setStatus(data.status);
       } else {
         throw new Error(data.error || 'Failed to start preview');
       }
     } catch (err: any) {
-      console.error('Failed to start preview', err);
+      console.error('[PREVIEW] startPreview exception:', err);
       setStatus('error');
       setError(err.message || 'Failed to start preview');
     }
