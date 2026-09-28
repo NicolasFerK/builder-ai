@@ -22,19 +22,62 @@ class ProjectServerManager {
   private projects: Map<string, ProjectInfo> = new Map();
   private readonly projectsRoot = path.join(process.cwd(), 'projects');
 
-  async getPackageManager(projectPath: string): Promise<string> {
+  async getPackageManager(projectPath: string): Promise<{ manager: string; conflict: string | null }> {
+    let preferredManager: string | null = null;
+    let detectedManagers: string[] = [];
+    let conflict: string | null = null;
+
+    // 1. Check package.json "packageManager"
+    try {
+      const pkgJsonPath = path.join(projectPath, 'package.json');
+      const pkgContent = await fs.readFile(pkgJsonPath, 'utf-8');
+      const pkg = JSON.parse(pkgContent);
+      if (pkg.packageManager) {
+        const match = pkg.packageManager.match(/^(npm|pnpm|yarn)/);
+        if (match) {
+          preferredManager = match[1];
+        }
+      }
+    } catch (e) {
+      // package.json might not exist or be invalid
+    }
+
+    // 2. Check lockfiles
     try {
       const files = await fs.readdir(projectPath);
       if (files.includes('pnpm-lock.yaml')) {
-        return 'pnpm';
+        detectedManagers.push('pnpm');
       }
       if (files.includes('yarn.lock')) {
-        return 'yarn';
+        detectedManagers.push('yarn');
       }
-      return 'npm';
+      if (files.includes('package-lock.json')) {
+        detectedManagers.push('npm');
+      }
+      
+      // 3. Check for .pnpm directory as a fallback/detection
+      if (detectedManagers.length === 0) {
+        const pnpmDir = path.join(projectPath, 'node_modules', '.pnpm');
+        try {
+          await fs.access(pnpmDir);
+          detectedManagers.push('pnpm');
+        } catch {
+          // not pnpm
+        }
+      }
     } catch (e) {
-      return 'npm';
+      // error reading dir
     }
+
+    // 4. Resolve
+    if (detectedManagers.length > 1) {
+      conflict = `Multiple lockfiles or package managers detected: ${detectedManagers.join(', ')}. Please clean up your project.`;
+    } else if (preferredManager && detectedManagers.length > 0 && preferredManager !== detectedManagers[0]) {
+      conflict = `Conflict: packageManager is ${preferredManager} but lockfile/structure suggests ${detectedManagers[0]}.`;
+    }
+
+    const manager = detectedManagers[0] || preferredManager || 'npm';
+    return { manager, conflict };
   }
 
   async start(projectId: string): Promise<ProjectInfo> {
@@ -65,8 +108,8 @@ class ProjectServerManager {
       projectPath,
       stdout: '',
       stderr: '',
-      npmInstallError: null,
       npmInstallExitCode: null,
+      npmInstallError: null,
       npmRunDevError: null,
       processExitCode: null,
       error: null,
@@ -75,13 +118,57 @@ class ProjectServerManager {
     this.projects.set(projectId, info);
 
     try {
-      const pkgManager = await this.getPackageManager(projectPath);
+      const { manager: pkgManager, conflict } = await this.getPackageManager(projectPath);
+      if (conflict) {
+        console.warn(`[PREVIEW] ${conflict}`);
+      }
+
       const nodeModulesPath = path.join(projectPath, 'node_modules');
-      
+      let needsInstall = false;
+
       try {
         await fs.access(nodeModulesPath);
+        
+        // Check for incompatibility: e.g., npm chosen but pnpm structure exists
+        if (pkgManager === 'npm') {
+          const pnpmDir = path.join(projectPath, 'node_modules', '.pnpm');
+          try {
+            await fs.access(pnpmDir);
+            console.warn('[PREVIEW] Detected pnpm structure in node_modules while npm is chosen. Marking for clean install.');
+            needsInstall = true;
+          } catch {
+            // compatible npm structure
+          }
+        }
+        
+        // If a lockfile exists but doesn't match the manager, we should probably reinstall
+        // This is covered by the fact that we prioritize the lockfile in getPackageManager.
+        // If getPackageManager returns 'pnpm' because of pnpm-lock.yaml, and pkgManager is 'pnpm', we are good.
+        // If pkgManager was 'npm' but pnpm-lock.yaml exists, conflict is reported and pkgManager is 'pnpm'.
+        
       } catch {
         console.log(`[PREVIEW] node_modules not found, installing dependencies with ${pkgManager} in ${projectPath}...`);
+        needsInstall = true;
+      }
+
+      // If conflict is too severe, we might want to stop. 
+      // For now, we'll proceed but with the caution of the reported conflict.
+      // But if we have multiple lockfiles, it's better to stop to avoid mess.
+      if (conflict && conflict.includes('Multiple lockfiles')) {
+          throw new Error(conflict);
+      }
+
+      if (needsInstall) {
+        console.log(`[PREVIEW] Preparing fresh installation with ${pkgManager} in ${projectPath}...`);
+        // Remove node_modules to ensure a clean state
+        try {
+          await fs.rm(nodeModulesPath, { recursive: true, force: true });
+        } catch (err) {
+          console.error(`[PREVIEW] Failed to remove existing node_modules:`, err);
+          // If we can't remove it, we might still want to try installing, 
+          // but it's risky. For now, let's try anyway.
+        }
+
         console.log('[PREVIEW-DEBUG] install started');
         try {
           await this.runCommandWithOutput(pkgManager, ['install'], projectPath);
