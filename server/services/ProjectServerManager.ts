@@ -192,11 +192,28 @@ class ProjectServerManager {
           info.npmInstallExitCode = 0;
           console.log('[PREVIEW-DEBUG] install exit code', 0);
         } catch (err: any) {
-          info.npmInstallError = err.message;
-          info.npmInstallExitCode = err.exitCode ?? -1;
-          console.error('[PREVIEW-DEBUG] install error', err.message);
-          console.error('[PREVIEW-DEBUG] install stderr', err.stderr || 'no stderr');
-          throw err;
+          console.error('[PREVIEW-DEBUG] Primary install failed:', err.message);
+          
+          // Fallback for known npm corruption error: "Cannot read properties of null (reading 'matches')"
+          if (pkgManager === 'npm' && err.message.includes('matches')) {
+            console.log('[PREVIEW] Detected potential npm corruption. Retrying with --no-package-lock...');
+            try {
+              await this.runCommandWithOutput(pkgManager, ['install', '--no-package-lock'], projectPath);
+              info.npmInstallExitCode = 0;
+              console.log('[PREVIEW-DEBUG] Fallback install exit code', 0);
+            } catch (fallbackErr: any) {
+              info.npmInstallError = fallbackErr.message;
+              info.npmInstallExitCode = fallbackErr.exitCode ?? -1;
+              console.error('[PREVIEW-DEBUG] Fallback install also failed', fallbackErr.message);
+              throw fallbackErr;
+            }
+          } else {
+            info.npmInstallError = err.message;
+            info.npmInstallExitCode = err.exitCode ?? -1;
+            console.error('[PREVIEW-DEBUG] install error', err.message);
+            console.error('[PREVIEW-DEBUG] install stderr', err.stderr || 'no stderr');
+            throw err;
+          }
         }
       }
 
