@@ -123,6 +123,16 @@ class ProjectServerManager {
         console.warn(`[PREVIEW] ${conflict}`);
       }
 
+      // Log detailed info for debugging as requested
+      console.log('[PREVIEW-DEBUG] STARTING PROJECT', {
+        projectId,
+        projectPath,
+        pkgManager,
+        conflict,
+        port,
+        url
+      });
+
       const nodeModulesPath = path.join(projectPath, 'node_modules');
       let needsInstall = false;
 
@@ -141,35 +151,41 @@ class ProjectServerManager {
           }
         }
         
-        // If a lockfile exists but doesn't match the manager, we should probably reinstall
-        // This is covered by the fact that we prioritize the lockfile in getPackageManager.
-        // If getPackageManager returns 'pnpm' because of pnpm-lock.yaml, and pkgManager is 'pnpm', we are good.
-        // If pkgManager was 'npm' but pnpm-lock.yaml exists, conflict is reported and pkgManager is 'pnpm'.
-        
       } catch {
         console.log(`[PREVIEW] node_modules not found, installing dependencies with ${pkgManager} in ${projectPath}...`);
         needsInstall = true;
       }
 
-      // If conflict is too severe, we might want to stop. 
-      // For now, we'll proceed but with the caution of the reported conflict.
-      // But if we have multiple lockfiles, it's better to stop to avoid mess.
       if (conflict && conflict.includes('Multiple lockfiles')) {
           throw new Error(conflict);
       }
 
       if (needsInstall) {
         console.log(`[PREVIEW] Preparing fresh installation with ${pkgManager} in ${projectPath}...`);
-        // Remove node_modules to ensure a clean state
+        
+        // 1. Remove node_modules to ensure a clean state
         try {
+          console.log(`[PREVIEW-DEBUG] Removing node_modules: ${nodeModulesPath}`);
           await fs.rm(nodeModulesPath, { recursive: true, force: true });
         } catch (err) {
           console.error(`[PREVIEW] Failed to remove existing node_modules:`, err);
-          // If we can't remove it, we might still want to try installing, 
-          // but it's risky. For now, let's try anyway.
         }
 
-        console.log('[PREVIEW-DEBUG] install started');
+        // 2. Remove all known lockfiles to resolve conflicts and corruption
+        const lockfiles = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'];
+        for (const lockfile of lockfiles) {
+          const lockfilePath = path.join(projectPath, lockfile);
+          try {
+            console.log(`[PREVIEW-DEBUG] Removing lockfile: ${lockfilePath}`);
+            await fs.rm(lockfilePath, { force: true });
+          } catch (err) {
+            // Ignore if file doesn't exist
+          }
+        }
+
+        console.log(`[PREVIEW-DEBUG] Command: ${pkgManager} install`);
+        console.log(`[PREVIEW-DEBUG] CWD: ${projectPath}`);
+        
         try {
           await this.runCommandWithOutput(pkgManager, ['install'], projectPath);
           info.npmInstallExitCode = 0;
@@ -178,6 +194,7 @@ class ProjectServerManager {
           info.npmInstallError = err.message;
           info.npmInstallExitCode = err.exitCode ?? -1;
           console.error('[PREVIEW-DEBUG] install error', err.message);
+          console.error('[PREVIEW-DEBUG] install stderr', err.stderr || 'no stderr');
           throw err;
         }
       }
@@ -264,6 +281,7 @@ class ProjectServerManager {
         else {
           const err = new Error(stderr || `Command ${command} exited with code ${code}`);
           (err as any).exitCode = code;
+          (err as any).stderr = stderr;
           reject(err);
         }
       });
