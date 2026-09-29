@@ -59,6 +59,6 @@
 }
 
 .sp-wrapper, .sp-stack, .sp-preview-container, .sp-preview-iframe {
-  height: 100% !important;
-  width: 100% !important;
+  height: 100%;
+  width: 100%;
 }
