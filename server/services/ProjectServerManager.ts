@@ -76,7 +76,7 @@ class ProjectServerManager {
       conflict = `Conflict: packageManager is ${preferredManager} but lockfile/structure suggests ${detectedManagers[0]}.`;
     }
 
-    const manager = detectedManagers[0] || preferredManager || 'npm';
+    const manager = detectedManagers[0] || preferredManager || 'pnpm';
     return { manager, conflict };
   }
 
