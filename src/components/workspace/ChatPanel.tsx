@@ -19,6 +19,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function ChatPanel() {
   const { projectId } = useParams();
@@ -28,6 +38,7 @@ export function ChatPanel() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [lastAiMessageId, setLastAiMessageId] = useState<string | null>(null);
   const [lastUndoState, setLastUndoState] = useState<{ files: any[], messageId: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -105,6 +116,17 @@ export function ChatPanel() {
     toast({
       title: 'Changes undone!',
       description: 'Reverted to the previous file state.',
+    });
+  };
+
+  const handleNewSession = () => {
+    if (!currentProject) return;
+
+    updateProject(currentProject.id, { chatHistory: [] });
+    setIsNewSessionDialogOpen(false);
+    toast({
+      title: 'New session started',
+      description: 'Conversation history has been cleared.',
     });
   };
 
@@ -405,12 +427,32 @@ export function ChatPanel() {
                 <RotateCcw className='mr-2 h-4 w-4' />
                 {isSummarizing ? 'Summarizing...' : 'Compact Context'}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { /* Placeholder for New Session */ }}>
+              <DropdownMenuItem onClick={() => setIsNewSessionDialogOpen(true)}>
                 <Zap className='mr-2 h-4 w-4' />
                 New Session
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <AlertDialog
+            open={isNewSessionDialogOpen}
+            onOpenChange={setIsNewSessionDialogOpen}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Start a new session?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will clear your current chat history. You won't be able to see previous messages in this session, but your files will remain unchanged.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleNewSession}>
+                  Start New Session
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
