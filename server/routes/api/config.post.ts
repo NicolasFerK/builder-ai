@@ -1,29 +1,34 @@
 import { defineHandler } from "nitro";
-import { readBody } from "nitro/h3";
+import { readBody, createError } from "nitro/h3";
 import { configService } from "../services/ConfigService";
 
 export default defineHandler(async (event) => {
   const body = await readBody<any>(event);
   
   if (!body) {
-    throw new Error("Request body is required");
+    throw createError({ statusCode: 400, statusMessage: "Request body is required" });
   }
 
-  if (body.aisettings) {
-    return await configService.updateAISettings(body.aisettings);
-  }
-
-  if (typeof body.publicPreviewUrl !== 'undefined') {
-    // Basic validation for URL
-    if (body.publicPreviewUrl) {
-      try {
-        new URL(body.publicPreviewUrl);
-      } catch (e) {
-        throw new Error("Invalid URL format");
-      }
+  try {
+    if (body.aisettings && typeof body.aisettings === 'object') {
+      return await configService.updateAISettings(body.aisettings);
     }
-    return await configService.updatePublicPreviewUrl(body.publicPreviewUrl);
-  }
 
-  throw new Error("Invalid request body. Provide 'aisettings' or 'publicPreviewUrl'.");
+    if (Object.prototype.hasOwnProperty.call(body, 'publicPreviewUrl')) {
+      const url = body.publicPreviewUrl;
+      if (url) {
+        try {
+          new URL(url);
+        } catch (e) {
+          throw createError({ statusCode: 400, statusMessage: "Invalid URL format" });
+        }
+      }
+      return await configService.updatePublicPreviewUrl(url);
+    }
+
+    throw createError({ statusCode: 400, statusMessage: "Invalid request body. Provide 'aisettings' or 'publicPreviewUrl'." });
+  } catch (error: any) {
+    if (error.statusCode) throw error;
+    throw createError({ statusCode: 500, statusMessage: error.message || "Internal Server Error" });
+  }
 });

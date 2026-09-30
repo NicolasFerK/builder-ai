@@ -61,11 +61,11 @@ const SettingsPage = () => {
         title: "Settings saved",
         description: "Your AI configuration has been updated.",
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: "Error saving settings",
-        description: "Could not update your AI configuration.",
+        description: error.message || "Could not update your AI configuration.",
       });
     } finally {
       setIsSaving(false);
@@ -79,11 +79,11 @@ const SettingsPage = () => {
         title: "Preview URL updated",
         description: "The public preview address has been saved.",
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: "Error saving URL",
-        description: "Could not update the preview URL.",
+        description: error.message || "Could not update the preview URL.",
       });
     }
   };

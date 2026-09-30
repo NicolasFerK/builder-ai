@@ -60,7 +60,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save settings');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.statusMessage || errorData.message || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Failed to update settings:', error);
@@ -82,7 +83,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save preview URL');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.statusMessage || errorData.message || 'Failed to save preview URL');
       }
     } catch (error) {
       console.error('Failed to update preview URL:', error);
@@ -97,8 +99,6 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     setSettings(DEFAULT_SETTINGS);
 
     try {
-      // We can't easily reset EVERYTHING via one call if we want to keep publicPreviewUrl unless we send it too
-      // But let's just reset AISettings
       await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

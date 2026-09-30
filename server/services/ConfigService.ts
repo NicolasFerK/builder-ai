@@ -40,7 +40,6 @@ export class ConfigService {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
       const parsed = JSON.parse(content);
       
-      // Merge loaded config with defaults to ensure completeness
       this.config = {
         aisettings: {
           ...DEFAULT_AISettings,
@@ -62,15 +61,19 @@ export class ConfigService {
 
   async save(newConfig: Partial<AppConfig>): Promise<AppConfig> {
     const currentConfig = await this.load();
-    const updatedConfig = { 
-      ...currentConfig, 
-      ...newConfig,
-      aisettings: {
-        ...currentConfig.aisettings,
-        ...(newConfig.aisettings || {})
-      }
-    };
     
+    const updatedConfig: AppConfig = {
+      ...currentConfig,
+      ...newConfig,
+    };
+
+    if (newConfig.aisettings) {
+      updatedConfig.aisettings = {
+        ...currentConfig.aisettings,
+        ...newConfig.aisettings,
+      };
+    }
+
     try {
       await fs.mkdir(path.dirname(CONFIG_FILE), { recursive: true });
       await fs.writeFile(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2), 'utf-8');
@@ -88,10 +91,8 @@ export class ConfigService {
   }
 
   async updateAISettings(newAISettings: Partial<AISettings>): Promise<AISettings> {
-    const config = await this.load();
-    const updatedAISettings = { ...config.aisettings, ...newAISettings };
-    await this.save({ aisettings: updatedAISettings });
-    return updatedAISettings;
+    const updatedConfig = await this.save({ aisettings: newAISettings });
+    return updatedConfig.aisettings;
   }
 
   async getPublicPreviewUrl(): Promise<string | undefined> {
@@ -100,8 +101,8 @@ export class ConfigService {
   }
 
   async updatePublicPreviewUrl(url: string | undefined): Promise<string | undefined> {
-    await this.save({ publicPreviewUrl: url });
-    return url;
+    const updatedConfig = await this.save({ publicPreviewUrl: url });
+    return updatedConfig.publicPreviewUrl;
   }
 }
 
