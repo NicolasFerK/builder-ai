@@ -1,6 +1,6 @@
 import { defineHandler } from "nitro";
 import { proxyRequest, createError } from "nitro/h3";
-import { projectServerManager } from "../../services/ProjectServerManager";
+import { projectServerManager } from "../../../services/ProjectServerManager";
 
 export default defineHandler(async (event) => {
   const pathParams = event.context.params?.path;
