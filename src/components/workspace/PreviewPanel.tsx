@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Monitor, Smartphone, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
@@ -11,8 +11,9 @@ interface PreviewPanelProps {
 
 export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
   const { settings, updateSettings } = useSettings();
-  const [status, setStatus] = useState<'loading' | 'running' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'running' | 'error' | 'not_found'>('loading');
   const [port, setPort] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
 
@@ -38,6 +39,7 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
       }
 
       setPort(data.port);
+      setPreviewUrl(data.url);
       setStatus('running');
     } catch (err: any) {
       console.error('[PREVIEW] Error starting preview:', err);
@@ -68,6 +70,7 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
       }
 
       setPort(data.port);
+      setPreviewUrl(data.url);
       setStatus('running');
       setIframeKey(prev => prev + 1);
     } catch (err: any) {
@@ -85,8 +88,6 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
   }, [projectId, startPreview]);
 
   // Reload iframe when files change (debounced)
-  // We use a simple effect that depends on files.length and maybe a hash of files.
-  // Since FileNode might be complex, let's use a simple approach.
   useEffect(() => {
     if (status === 'running' && port) {
       const timer = setTimeout(() => {
@@ -100,18 +101,11 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
     restartPreview();
   };
 
-  const proxyUrl = useMemo(() => {
-    if (port && projectId) {
-      return `/api/proxy/${encodeURIComponent(projectId)}/p-${port}/`;
-    }
-    return '';
-  }, [port, projectId]);
-
   return (
     <div className='flex flex-col h-full bg-muted/30'>
       <div className='p-2 border-b flex items-center justify-between bg-background'>
         <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
+          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span\>
         </div>
         <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
           <Button 
@@ -173,10 +167,10 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
             </div>
           )}
 
-          {status === 'running' && port && (
+          {status === 'running' && previewUrl && (
             <iframe
               key={iframeKey}
-              src={proxyUrl}
+              src={previewUrl}
               className='w-full h-full border-none'
               title="Project Preview"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

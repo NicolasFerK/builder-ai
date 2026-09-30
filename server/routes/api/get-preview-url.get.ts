@@ -21,6 +21,11 @@ export default defineHandler(async (event) => {
     };
   }
 
+  // Get the public base URL from environment variables
+  // The user should set PREVIEW_PUBLIC_BASE_URL in their RunPod environment.
+  // e.g. PREVIEW_PUBLIC_BASE_URL=https://your-pod-id-5173.proxy.runpod.net
+  const publicBaseUrl = process.env.PREVIEW_PUBLIC_BASE_URL;
+
   if (info.status === 'error') {
     return {
       url: info.url,
@@ -41,8 +46,16 @@ export default defineHandler(async (event) => {
     };
   }
 
+  let finalUrl = info.url;
+  if (publicBaseUrl && info.port === 5173) {
+    // If we are using the public port 5173, construct the public URL
+    // Ensure there is no trailing slash in publicBaseUrl to avoid double slashes
+    const base = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
+    finalUrl = `${base}/`;
+  }
+
   return {
-    url: info.url,
+    url: finalUrl,
     status: info.status,
   };
 });

@@ -1,6 +1,6 @@
 import { defineHandler } from "nitro";
 import { readBody, createError } from "nitro/h3";
-import { projectServerManager } from '../../services/ProjectServerManager';
+import { projectServerManager } from "../../services/ProjectServerManager";
 
 export default defineHandler(async (event) => {
   const body = await readBody(event);
@@ -17,11 +17,26 @@ export default defineHandler(async (event) => {
 
   try {
     const info = await projectServerManager.start(projectId);
+    
+    // Wait for the server to be actually ready before responding
+    const isReady = await projectServerManager.waitForReady(projectId);
+    
+    if (!isReady && info.status !== 'error') {
+      throw new Error('Vite server started but failed to become ready within the timeout.');
+    }
+
+    let finalUrl = info.url;
+    const publicBaseUrl = process.env.PREVIEW_PUBLIC_BASE_URL;
+    if (publicBaseUrl && info.port === 5173) {
+      const base = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
+      finalUrl = `${base}/`;
+    }
+
     return {
       success: true,
       projectId,
       port: info.port,
-      url: info.url,
+      url: finalUrl,
       status: info.status,
     };
   } catch (error: any) {
