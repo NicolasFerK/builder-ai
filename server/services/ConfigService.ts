@@ -37,8 +37,11 @@ export class ConfigService {
     if (this.config) return this.config;
 
     try {
+      console.log('[ConfigService] Loading config from:', CONFIG_FILE);
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
       const parsed = JSON.parse(content);
+      
+      console.log('[ConfigService] Config loaded:', JSON.stringify(parsed));
       
       this.config = {
         aisettings: {
@@ -49,10 +52,15 @@ export class ConfigService {
       };
     } catch (error: any) {
       if (error.code === 'ENOENT') {
+        console.log('[ConfigService] Config file not found, using defaults');
         this.config = { ...DEFAULT_CONFIG };
         await this.save(this.config);
       } else {
-        console.error('[ConfigService] Error loading config:', error);
+        console.error('[ConfigService] Error loading config:', {
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        });
         this.config = { ...DEFAULT_CONFIG };
       }
     }
@@ -61,6 +69,8 @@ export class ConfigService {
 
   async save(newConfig: Partial<AppConfig>): Promise<AppConfig> {
     const currentConfig = await this.load();
+    console.log('[ConfigService] Current config before save:', JSON.stringify(currentConfig));
+    console.log('[ConfigService] New partial config to save:', JSON.stringify(newConfig));
     
     const updatedConfig: AppConfig = {
       ...currentConfig,
@@ -74,12 +84,25 @@ export class ConfigService {
       };
     }
 
+    console.log('[ConfigService] Final updated config:', JSON.stringify(updatedConfig));
+
     try {
-      await fs.mkdir(path.dirname(CONFIG_FILE), { recursive: true });
+      const dir = path.dirname(CONFIG_FILE);
+      console.log('[ConfigService] Ensuring directory exists:', dir);
+      await fs.mkdir(dir, { recursive: true });
+      
+      console.log('[ConfigService] Writing config to:', CONFIG_FILE);
       await fs.writeFile(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2), 'utf-8');
+      
       this.config = updatedConfig;
+      console.log('[ConfigService] Save successful');
     } catch (error) {
-      console.error('[ConfigService] Error saving config:', error);
+      console.error('[ConfigService] Error saving config:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        configPath: CONFIG_FILE
+      });
       throw error;
     }
     return updatedConfig;
