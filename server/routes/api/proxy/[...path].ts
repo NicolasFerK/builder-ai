@@ -48,6 +48,9 @@ export default defineHandler(async (event) => {
 
   // 1. Security Check: Validate that this port belongs to this projectId
   const info = projectServerManager.getStatus(projectId);
+  
+  console.log(`[PROXY-DEBUG] Project info for ${projectId}:`, JSON.stringify(info, (key, value) => key === 'process' ? undefined : value));
+
   if (!info || info.port !== port) {
     console.error(`[PROXY] Unauthorized access attempt: projectId=${projectId}, requestedPort=${port}, actualPort=${info?.port}`);
     throw createError({
@@ -65,9 +68,10 @@ export default defineHandler(async (event) => {
     return await proxyRequest(event, targetUrl);
   } catch (err: any) {
     console.error(`[PROXY] Error proxying request ${event.path} to ${targetUrl}:`, err.message);
+    console.error('[PROXY-DEBUG] Error details:', err);
     throw createError({
       statusCode: 502,
-      statusMessage: "Bad Gateway: Failed to proxy request to internal dev server",
+      statusMessage: `Bad Gateway: ${err.message}`,
     });
   }
 });
