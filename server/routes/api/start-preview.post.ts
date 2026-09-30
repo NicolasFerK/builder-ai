@@ -47,14 +47,17 @@ export default defineHandler(async (event) => {
       statusMessage: error.message || 'Failed to start preview',
       data: {
         diagnostics: info ? {
-          stdout: info.stdout,
-          stderr: info.stderr,
-          npmInstallError: info.npmInstallError,
-          npmInstallExitCode: info.npmInstallExitCode,
-          npmRunDevError: info.npmRunDevError,
-          processExitCode: info.processExitCode,
-          error: info.error,
-        } : undefined,
+        stdout: info.stdout,
+        stderr: info.stderr,
+        npmInstallError: info.npmInstallError,
+        npmInstallExitCode: info.npmInstallExitCode,
+        npmRunDevError: info.npmRunDevError,
+        processExitCode: info.processExitCode,
+        processSignal: info.processSignal,
+        command: info.command,
+        cwd: info.cwd,
+        error: info.error,
+      } : undefined,
       },
     });
   }

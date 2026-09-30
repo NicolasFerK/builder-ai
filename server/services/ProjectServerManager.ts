@@ -15,6 +15,9 @@ export interface ProjectInfo {
   npmInstallExitCode: number | null;
   npmRunDevError: string | null;
   processExitCode: number | null;
+  processSignal: string | null;
+  command: string | null;
+  cwd: string | null;
   error: string | null;
 }
 
@@ -144,6 +147,9 @@ class ProjectServerManager {
       npmInstallError: null,
       npmRunDevError: null,
       processExitCode: null,
+      processSignal: null,
+      command: null,
+      cwd: null,
       error: null,
     };
     this.projects.set(projectId, info);
@@ -219,15 +225,6 @@ class ProjectServerManager {
       // 6. Start Dev Server
       console.log(`[PREVIEW] starting dev server with ${pkgManager} on port: ${port}`);
 
-      // Constructing the command carefully. 
-      // Using a single command string with shell: true is more reliable for argument passing in varied environments.
-      // We avoid the extra '--' if it was causing issues, but keep it for npm/pnpm if needed.
-      // Actually, the user saw 'vite -- --port 5173', so let's avoid the double '--'.
-      // Most modern package managers (npm, pnpm, yarn) handle arguments directly if we use them correctly.
-      // For npm/pnpm, 'npm run dev -- --port' is standard.
-      // But if that's causing 'vite -- --port', we'll try without the extra '--' first or use a different approach.
-      
-      // Let's try the most robust way:
       let command = '';
       if (pkgManager === 'npm' || pkgManager === 'pnpm') {
         command = `${pkgManager} run dev -- --port ${port} --host 0.0.0.0 --strictPort`;
@@ -237,16 +234,11 @@ class ProjectServerManager {
         command = `${pkgManager} run dev --port ${port} --host 0.0.0.0 --strictPort`;
       }
 
-      // Note: We use 'spawn' with a single string command when shell: true is used.
-      // To avoid the "vite -- --port" issue, we'll check if the command itself might be the problem.
-      // If the user saw 'vite -- --port', it's because the command was 'npm run dev -- --port'.
-      // In many environments, 'npm run dev -- --port' is correctly translated to 'vite --port'.
-      // If it's NOT, it might be because of the shell.
-      
-      // Let's try a safer approach: split the command and use shell: true carefully, 
-      // OR just use the array and shell: false if possible.
-      // But npm/pnpm/yarn need a shell to resolve.
-      
+      info.command = command;
+      info.cwd = projectPath;
+
+      console.log(`[PREVIEW] Executing command: "${command}" in ${projectPath}`);
+
       const child = spawn(command, [], {
         cwd: projectPath,
         shell: true,
@@ -277,18 +269,18 @@ class ProjectServerManager {
         info.error = err.message;
       });
 
-      child.on('exit', (code) => {
-        console.log(`[PREVIEW] Process exited with code ${code}`);
+      child.on('exit', (code, signal) => {
+        console.log(`[PREVIEW] Process exited with code ${code} and signal ${signal}`);
         info.processExitCode = code;
-        info.status = code === 0 ? 'stopped' : 'error';
+        info.processSignal = signal;
+        info.status = (code === 0) ? 'stopped' : 'error';
         info.process = null;
       });
 
       // 7. Wait for the port to actually be responsive
       const isReady = await this.waitForReady(port, 15000);
       if (!isReady) {
-        const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
-        console.error(`[PREVIEW] ${errorMsg}`);
+        console.error(`[PREVIEW] Vite failed to become responsive on port ${port} within 15 seconds.`);
         
         // Cleanup
         if (child.pid) {
@@ -296,10 +288,25 @@ class ProjectServerManager {
             child.kill('SIGKILL');
           } catch (e) {}
         }
-        // Wait for process to actually exit to free the port
-        await new Promise(resolve => child.on('exit', resolve));
         
-        throw new Error(errorMsg);
+        // Wait for process to actually exit to free the port and populate exitCode/signal
+        await new Promise(resolve => child.on('exit', resolve));
+
+        const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
+        const diagnostics = [
+          `Error: ${errorMsg}`,
+          `Command: ${command}`,
+          `CWD: ${projectPath}`,
+          `PID: ${child.pid || 'unknown'}`,
+          `Exit Code: ${child.exitCode}`,
+          `Exit Signal: ${child.signal}`,
+          `Installation Status: ${info.npmInstallExitCode === 0 ? 'Success' : 'Failed/Not run'}`,
+          `Installation Error: ${info.npmInstallError || 'None'}`,
+          `Dev Server Stdout: ${info.stdout.slice(-500)}`, // last 500 chars
+          `Dev Server Stderr: ${info.stderr.slice(-500)}`, // last 500 chars
+        ].join('\n');
+        
+        throw new Error(diagnostics);
       }
 
       return info;
@@ -337,7 +344,11 @@ class ProjectServerManager {
         shell: true,
         stdio: 'pipe',
       });
+      let stdout = '';
       let stderr = '';
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
       child.stderr?.on('data', (data) => {
         stderr += data.toString();
       });
@@ -347,6 +358,7 @@ class ProjectServerManager {
           const err = new Error(stderr || `Command ${command} exited with code ${code}`);
           (err as any).exitCode = code;
           (err as any).stderr = stderr;
+          (err as any).stdout = stdout;
           reject(err);
         }
       });
