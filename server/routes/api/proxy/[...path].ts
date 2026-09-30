@@ -24,7 +24,7 @@ export default defineHandler(async (event) => {
   }
 
   const projectId = decodeURIComponent(segments[0]);
-  const portStr = segments[1];
+  const portStr = segments[1].startsWith('p-') ? segments[1].substring(2) : segments[1];
   const port = parseInt(portStr, 10);
   
   // The rest of the path segments
