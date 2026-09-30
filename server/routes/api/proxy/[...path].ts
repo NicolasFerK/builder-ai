@@ -3,22 +3,32 @@ import { proxyRequest, createError } from "nitro/h3";
 import { projectServerManager } from "../../../services/ProjectServerManager";
 
 export default defineHandler(async (event) => {
-  const pathParams = event.context.params?.path;
+  const pathParam = event.context.params?.path;
 
-  if (!pathParams || pathParams.length < 2) {
-    console.error('[PROXY] Invalid proxy request path:', pathParams);
+  if (!pathParam) {
+    console.error('[PROXY] No path provided in params');
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Invalid proxy request. Missing path parameter.",
+    });
+  }
+
+  const segments = typeof pathParam === 'string' ? pathParam.split('/') : pathParam;
+
+  if (segments.length < 2) {
+    console.error('[PROXY] Invalid proxy request path segments:', segments);
     throw createError({
       statusCode: 400,
       statusMessage: "Invalid proxy request. Expected format: /api/proxy/[projectId]/[port]/[...path]",
     });
   }
 
-  const projectId = decodeURIComponent(pathParams[0]);
-  const portStr = pathParams[1];
+  const projectId = decodeURIComponent(segments[0]);
+  const portStr = segments[1];
   const port = parseInt(portStr, 10);
   
   // The rest of the path segments
-  const restOfPath = pathParams.slice(2).join('/');
+  const restOfPath = segments.slice(2).join('/');
 
   if (!projectId) {
     throw createError({
