@@ -101,8 +101,8 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
   };
 
   const proxyUrl = useMemo(() => {
-    if (port) {
-      return `/api/proxy/${projectId}/${port}/`;
+    if (port && projectId) {
+      return `/api/proxy/${encodeURIComponent(projectId)}/${port}/`;
     }
     return '';
   }, [port, projectId]);
