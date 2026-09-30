@@ -122,12 +122,13 @@ class ProjectServerManager {
     return false;
   }
 
-  private getPublicUrl(port: number): string {
-    const publicBaseUrl = process.env.PREVIEW_PUBLIC_BASE_URL;
-    if (!publicBaseUrl) {
+  private async getPublicUrl(port: number): Promise<string> {
+    const { configService } = await import('./ConfigService');
+    const publicPreviewUrl = await configService.getPublicPreviewUrl();
+    if (!publicPreviewUrl) {
       return `http://127.0.0.1:${port}`;
     }
-    const base = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
+    const base = publicPreviewUrl.endsWith('/') ? publicPreviewUrl.slice(0, -1) : publicPreviewUrl;
     return `${base}/`;
   }
 
@@ -143,7 +144,7 @@ class ProjectServerManager {
     const projectPath = path.join(this.projectsRoot, projectId);
     const port = this.PREVIEW_PORT;
     const internalUrl = `http://127.0.0.1:${port}`;
-    const publicUrl = this.getPublicUrl(port);
+    const publicUrl = await this.getPublicUrl(port);
 
     // 2. Create the project info entry IMMEDIATELY to prevent race conditions
     const info: ProjectInfo = {
@@ -249,7 +250,7 @@ class ProjectServerManager {
       info.command = command;
       info.cwd = projectPath;
 
-      console.log(`[PREVIEW] Executing command: \"${command}\" in ${projectPath}`);
+      console.log(`[PREVIEW] Executing command: \\\"${command}\\\" in ${projectPath}`);
 
       const child = spawn(command, [], {
         cwd: projectPath,
@@ -305,100 +306,5 @@ class ProjectServerManager {
         await new Promise(resolve => child.on('exit', resolve));
 
         const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
-        const diagnostics = [
-          `Error: ${errorMsg}`,
-          `Command: ${command}`,
-          `CWD: ${projectPath}`,
-          `PID: ${child.pid || 'unknown'}`,
-          `Exit Code: ${child.exitCode}`,
-          `Exit Signal: ${child.signal}`,
-          `Installation Status: ${info.npmInstallExitCode === 0 ? 'Success' : 'Failed/Not run'}`,
-          `Installation Error: ${info.npmInstallError || 'None'}`,
-          `Dev Server Stdout: ${info.stdout.slice(-500)}`, // last 500 chars
-          `Dev Server Stderr: ${info.stderr.slice(-500)}`, // last 500 chars
-        ].join('\\n');
-        
-        throw new Error(diagnostics);
-      }
-
-      return info;
-
-    } catch (error: any) {
-      console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
-      info.status = 'error';
-      info.error = error.message;
-      
-      // If it failed during starting, ensure we clean up the process if it exists
-      if (info.process) {
-        try {
-          info.process.kill('SIGKILL');
-        } catch (e) {}
-        // Wait for it to be fully gone
-        await new Promise(resolve => info.process?.on('exit', resolve));
-        info.process = null;
-      }
-      
-      return info;
-    }
-  }
-
-  async waitForReady(projectId: string, timeoutMs = 30000): Promise<boolean> {
-    const info = this.projects.get(projectId);
-    if (!info) return false;
-    return this.waitForPort(info.port, timeoutMs);
-  }
-
-  private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const cmd = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-      const child = spawn(cmd, [], {
-        cwd,
-        shell: true,
-        stdio: 'pipe',
-      });
-      let stdout = '';
-      let stderr = '';
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
-      child.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
-      child.on('close', (code) => {
-        if (code === 0) resolve();
-        else {
-          const err = new Error(stderr || `Command ${command} exited with code ${code}`);
-          (err as any).exitCode = code;
-          (err as any).stderr = stderr;
-          (err as any).stdout = stdout;
-          reject(err);
-        }
-      });
-      child.on('error', reject);
-    });
-  }
-
-  async stop(projectId: string) {
-    const info = this.projects.get(projectId);
-    if (info && info.process) {
-      info.process.kill();
-      info.status = 'stopped';
-      info.process = null;
-    }
-  }
-
-  async restart(projectId: string) {
-    await this.stop(projectId);
-    return this.start(projectId);
-  }
-
-  getStatus(projectId: string): ProjectInfo | undefined {
-    return this.projects.get(projectId);
-  }
-
-  getUrl(projectId: string): string | undefined {
-    return this.projects.get(projectId)?.publicUrl;
-  }
-}
-
-export const projectServerManager = new ProjectServerManager();
+        const diagnostics = [\n          `Error: ${errorMsg}`,\n          `Command: ${command}`,\n          `CWD: ${projectPath}`,\n          `PID: ${child.pid || 'unknown'}`,\n          `Exit Code: ${child.exitCode}`,\n          `Exit Signal: ${child.signal}`,\n          `Installation Status: ${info.npmInstallExitCode === 0 ? 'Success' : 'Failed/Not run'}`,\n          `Installation Error: ${info.npmInstallError || 'None'}`,\n          `Dev Server Stdout: ${info.stdout.slice(-500)}`, // last 500 chars\n          `Dev Server Stderr: ${info.stderr.slice(-500)}`, // last 500 chars\n        ].join('\\\\n');
+        \n        throw new Error(diagnostics);\n      }\n\n      return info;\n\n    } catch (error: any) {\n      console.error(`[PREVIEW] [${projectId}] failed to start:`, error);\n      info.status = 'error';\n      info.error = error.message;\n      \n      // If it failed during starting, ensure we clean up the process if it exists\n      if (info.process) {\n        try {\n          info.process.kill('SIGKILL');\n        } catch (e) {}\n        // Wait for it to be fully gone\n        await new Promise(resolve => info.process?.on('exit', resolve));\n        info.process = null;\n      }\n      \n      return info;\n    }\n  }\n\n  async waitForReady(projectId: string, timeoutMs = 30000): Promise<boolean> {\n    const info = this.projects.get(projectId);\n    if (!info) return false;\n    return this.waitForPort(info.port, timeoutMs);\n  }\n\n  private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {\n    return new Promise((resolve, reject) => {\n      const cmd = args.length > 0 ? `${command} ${args.join(' ')}` : command;\n      const child = spawn(cmd, [], {\n        cwd,\n        shell: true,\n        stdio: 'pipe',\n      });\n      let stdout = '';\n      let stderr = '';\n      child.stdout?.on('data', (data) => {\n        stdout += data.toString();\n      });\n      child.stderr?.on('data', (data) => {\n        stderr += data.toString();\n      });\n      child.on('close', (code) => {\n        if (code === 0) resolve();\n        else {\n          const err = new Error(stderr || `Command ${command} exited with code ${code}`);\n          (err as any).exitCode = code;\n          (err as any).stderr = stderr;\n          (err as any).stdout = stdout;\n          reject(err);\n        }\n      });\n      child.on('error', reject);\n    });\n  }\n\n  async stop(projectId: string) {\n    const info = this.projects.get(projectId);\n    if (info && info.process) {\n      info.process.kill();\n      info.status = 'stopped';\n      info.process = null;\n    }\n  }\n\n  async restart(projectId: string) {\n    await this.stop(projectId);\n    return this.start(projectId);\n  }\n\n  getStatus(projectId: string): ProjectInfo | undefined {\n    return this.projects.get(projectId);\n  }\n\n  getUrl(projectId: string): string | undefined {\n    return this.projects.get(projectId)?.publicUrl;\n  }\n}\n\nexport const projectServerManager = new ProjectServerManager();\n

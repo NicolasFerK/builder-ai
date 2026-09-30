@@ -53,4 +53,5 @@ export type AISettings = {
   modelName?: string;
   theme?: 'light' | 'dark';
   viewMode?: 'desktop' | 'mobile';
+  publicPreviewUrl?: string;
 };
