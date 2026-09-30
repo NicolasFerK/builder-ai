@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '@/context/SettingsContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun, Globe, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun, Globe, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,16 +22,40 @@ import {
 const SettingsPage = () => {
   const { settings, updateSettings, updatePublicPreviewUrl, resetSettings } = useSettings();
   const { toast } = useToast();
+  
+  // Local state for form fields to avoid race conditions and excessive server calls
+  const [aiFormData, setAiFormData] = useState({
+    apiUrl: settings.apiUrl,
+    apiKey: settings.apiKey || '',
+    modelName: settings.modelName || '',
+  });
+  
   const [previewUrl, setPreviewUrl] = useState(settings.publicPreviewUrl || '');
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync local state when settings are loaded or changed externally
+  useEffect(() => {
+    setAiFormData({
+      apiUrl: settings.apiUrl,
+      apiKey: settings.apiKey || '',
+      modelName: settings.modelName || '',
+    });
+  }, [settings.apiUrl, settings.apiKey, settings.modelName]);
+
+  // Sync previewUrl when settings are loaded
+  useEffect(() => {
+    setPreviewUrl(settings.publicPreviewUrl || '');
+  }, [settings.publicPreviewUrl]);
 
   const handleAISettingsSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
       await updateSettings({ 
-        apiUrl: settings.apiUrl, 
-        apiKey: settings.apiKey, 
-        modelName: settings.modelName 
+        apiUrl: aiFormData.apiUrl, 
+        apiKey: aiFormData.apiKey, 
+        modelName: aiFormData.modelName 
       });
       toast({
         title: "Settings saved",
@@ -43,6 +67,8 @@ const SettingsPage = () => {
         title: "Error saving settings",
         description: "Could not update your AI configuration.",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,9 +92,6 @@ const SettingsPage = () => {
     if (!previewUrl) return;
     setIsTesting(true);
     try {
-      // A simple check to see if the URL is reachable
-      // Note: This might fail due to CORS if the proxy doesn't allow it,
-      // but we can use it as a basic connectivity test.
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
@@ -91,8 +114,8 @@ const SettingsPage = () => {
     }
   };
 
-  const handleReset = () => {
-    resetSettings();
+  const handleReset = async () => {
+    await resetSettings();
     toast({
       title: "Settings reset",
       description: "Your AI configuration has been cleared.",
@@ -193,8 +216,8 @@ const SettingsPage = () => {
                 id="apiUrl"
                 type="url"
                 placeholder="https://api.example.com/v1/chat/completions"
-                value={settings.apiUrl}
-                onChange={(e) => updateSettings({ apiUrl: e.target.value })}
+                value={aiFormData.apiUrl}
+                onChange={(e) => setAiFormData({ ...aiFormData, apiUrl: e.target.value })}
                 required
               />
               <p className="text-xs text-muted-foreground">
@@ -208,8 +231,8 @@ const SettingsPage = () => {
                 id="apiKey"
                 type="password"
                 placeholder="sk-..."
-                value={settings.apiKey}
-                onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                value={aiFormData.apiKey}
+                onChange={(e) => setAiFormData({ ...aiFormData, apiKey: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
                 Your authentication token for the API.
@@ -222,8 +245,8 @@ const SettingsPage = () => {
                 id="modelName"
                 type="text"
                 placeholder="gpt-4o, claude-3-5-sonnet, etc."
-                value={settings.modelName}
-                onChange={(e) => updateSettings({ modelName: e.target.value })}
+                value={aiFormData.modelName}
+                onChange={(e) => setAiFormData({ ...aiFormData, modelName: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
                 The specific model identifier to use.
@@ -231,9 +254,9 @@ const SettingsPage = () => {
             </div>
 
             <div className="flex gap-4 pt-4">
-              <Button type="submit" className="flex-1 gap-2">
-                <Save className="w-4 h-4" />
-                Save Changes
+              <Button type="submit" className="flex-1 gap-2" disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
               <Button 
                 type="button" 
