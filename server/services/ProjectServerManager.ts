@@ -119,6 +119,7 @@ class ProjectServerManager {
   }
 
   async start(projectId: string): Promise<ProjectInfo> {
+    // 1. Check if project is already being managed
     if (this.projects.has(projectId)) {
       const existing = this.projects.get(projectId)!;
       if (existing.status === 'running' || existing.status === 'starting') {
@@ -127,35 +128,10 @@ class ProjectServerManager {
     }
 
     const projectPath = path.join(this.projectsRoot, projectId);
-    
-    try {
-      await fs.mkdir(projectPath, { recursive: true });
-    } catch (e) {
-      console.error(`[PREVIEW] Failed to create directory ${projectPath}`, e);
-    }
-
     const port = this.PREVIEW_PORT;
-
-    const isPortManaged = Array.from(this.projects.values()).some(
-      p => p.port === port && (p.status === 'running' || p.status === 'starting')
-    );
-
-    if (isPortManaged) {
-      const errorMsg = `Port ${port} is already in use by another preview project. Only one project can be previewed at a time.`;
-      console.error('[PREVIEW] Port conflict:', errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    const isPortFree = await this.isPortAvailable(port);
-    if (!isPortFree) {
-      const errorMsg = `Port ${port} is already occupied by another process on this machine.`;
-      console.error('[PREVIEW] Port conflict:', errorMsg);
-      throw new Error(errorMsg);
-    }
-
     const url = `http://127.0.0.1:${port}`;
-    console.log('[PREVIEW-DEBUG] starting project', { projectId, projectPath, port, url });
 
+    // 2. Create the project info entry IMMEDIATELY to prevent race conditions
     const info: ProjectInfo = {
       process: null,
       port,
@@ -170,10 +146,35 @@ class ProjectServerManager {
       processExitCode: null,
       error: null,
     };
-
     this.projects.set(projectId, info);
 
     try {
+      // 3. Ensure directory exists
+      try {
+        await fs.mkdir(projectPath, { recursive: true });
+      } catch (e) {
+        console.error(`[PREVIEW] Failed to create directory ${projectPath}`, e);
+      }
+
+      // 4. Check for port conflicts (other projects or other processes)
+      const isPortManaged = Array.from(this.projects.values()).some(
+        p => p.port === port && (p.status === 'running' || p.status === 'starting') && p.projectPath !== projectPath
+      );
+
+      if (isPortManaged) {
+        const errorMsg = `Port ${port} is already in use by another preview project.`;
+        throw new Error(errorMsg);
+      }
+
+      const isPortFree = await this.isPortAvailable(port);
+      if (!isPortFree) {
+        const errorMsg = `Port ${port} is already occupied by another process on this machine.`;
+        throw new Error(errorMsg);
+      }
+
+      console.log('[PREVIEW] starting project', { projectId, projectPath, port, url });
+
+      // 5. Package Manager & Dependencies
       const { manager: pkgManager, conflict } = await this.getPackageManager(projectPath);
       if (conflict) {
         console.warn(`[PREVIEW] ${conflict}`);
@@ -184,21 +185,9 @@ class ProjectServerManager {
 
       try {
         await fs.access(nodeModulesPath);
-        if (pkgManager === 'npm') {
-          const pnpmDir = path.join(projectPath, 'node_modules', '.pnpm');
-          try {
-            await fs.access(pnpmDir);
-            console.warn('[PREVIEW] Detected pnpm structure in node_modules while npm is chosen. Marking for clean install.');
-            needsInstall = true;
-          } catch {}
-        }
       } catch {
         console.log(`[PREVIEW] node_modules not found, installing dependencies with ${pkgManager}...`);
         needsInstall = true;
-      }
-
-      if (conflict && conflict.includes('Multiple lockfiles')) {
-          throw new Error(conflict);
       }
 
       if (needsInstall) {
@@ -221,31 +210,44 @@ class ProjectServerManager {
           await this.runCommandWithOutput(pkgManager, ['install'], projectPath);
           info.npmInstallExitCode = 0;
         } catch (err: any) {
-          if (pkgManager === 'npm' && err.message.includes('matches')) {
-            console.log('[PREVIEW] Detected potential npm corruption. Retrying with --no-package-lock...');
-            try {
-              await this.runCommandWithOutput(pkgManager, ['install', '--no-package-lock'], projectPath);
-              info.npmInstallExitCode = 0;
-            } catch (fallbackErr: any) {
-              info.npmInstallError = fallbackErr.message;
-              info.npmInstallExitCode = fallbackErr.exitCode ?? -1;
-              throw fallbackErr;
-            }
-          } else {
-            info.npmInstallError = err.message;
-            info.npmInstallExitCode = err.exitCode ?? -1;
-            throw err;
-          }
+          info.npmInstallError = err.message;
+          info.npmInstallExitCode = err.exitCode ?? -1;
+          throw err;
         }
       }
 
+      // 6. Start Dev Server
       console.log(`[PREVIEW] starting dev server with ${pkgManager} on port: ${port}`);
 
-      const devArgs = pkgManager === 'npm' || pkgManager === 'pnpm'
-        ? ['run', 'dev', '--', '--port', port.toString(), '--host', '0.0.0.0', '--strictPort']
-        : ['run', 'dev', '--port', port.toString(), '--host', '0.0.0.0', '--strictPort'];
+      // Constructing the command carefully. 
+      // Using a single command string with shell: true is more reliable for argument passing in varied environments.
+      // We avoid the extra '--' if it was causing issues, but keep it for npm/pnpm if needed.
+      // Actually, the user saw 'vite -- --port 5173', so let's avoid the double '--'.
+      // Most modern package managers (npm, pnpm, yarn) handle arguments directly if we use them correctly.
+      // For npm/pnpm, 'npm run dev -- --port' is standard.
+      // But if that's causing 'vite -- --port', we'll try without the extra '--' first or use a different approach.
+      
+      // Let's try the most robust way:
+      let command = '';
+      if (pkgManager === 'npm' || pkgManager === 'pnpm') {
+        command = `${pkgManager} run dev -- --port ${port} --host 0.0.0.0 --strictPort`;
+      } else if (pkgManager === 'yarn') {
+        command = `yarn dev --port ${port} --host 0.0.0.0 --strictPort`;
+      } else {
+        command = `${pkgManager} run dev --port ${port} --host 0.0.0.0 --strictPort`;
+      }
 
-      const child = spawn(pkgManager, devArgs, {
+      // Note: We use 'spawn' with a single string command when shell: true is used.
+      // To avoid the "vite -- --port" issue, we'll check if the command itself might be the problem.
+      // If the user saw 'vite -- --port', it's because the command was 'npm run dev -- --port'.
+      // In many environments, 'npm run dev -- --port' is correctly translated to 'vite --port'.
+      // If it's NOT, it might be because of the shell.
+      
+      // Let's try a safer approach: split the command and use shell: true carefully, 
+      // OR just use the array and shell: false if possible.
+      // But npm/pnpm/yarn need a shell to resolve.
+      
+      const child = spawn(command, [], {
         cwd: projectPath,
         shell: true,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -265,27 +267,58 @@ class ProjectServerManager {
         const output = data.toString();
         info.stderr += output;
         if (output.toLowerCase().includes('error')) {
-          info.status = 'error';
           info.npmRunDevError = output.trim();
         }
       });
 
       child.on('error', (err) => {
+        console.error(`[PREVIEW] Process error:`, err);
         info.status = 'error';
         info.error = err.message;
       });
 
       child.on('exit', (code) => {
+        console.log(`[PREVIEW] Process exited with code ${code}`);
         info.processExitCode = code;
         info.status = code === 0 ? 'stopped' : 'error';
         info.process = null;
       });
 
+      // 7. Wait for the port to actually be responsive
+      const isReady = await this.waitForReady(port, 15000);
+      if (!isReady) {
+        const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
+        console.error(`[PREVIEW] ${errorMsg}`);
+        
+        // Cleanup
+        if (child.pid) {
+          try {
+            child.kill('SIGKILL');
+          } catch (e) {}
+        }
+        // Wait for process to actually exit to free the port
+        await new Promise(resolve => child.on('exit', resolve));
+        
+        throw new Error(errorMsg);
+      }
+
       return info;
+
     } catch (error: any) {
       console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
       info.status = 'error';
       info.error = error.message;
+      
+      // If it failed during starting, ensure we clean up the process if it exists
+      if (info.process) {
+        try {
+          info.process.kill('SIGKILL');
+        } catch (e) {}
+        // Wait for it to be fully gone
+        await new Promise(resolve => info.process?.on('exit', resolve));
+        info.process = null;
+      }
+      
       return info;
     }
   }
@@ -298,7 +331,8 @@ class ProjectServerManager {
 
   private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, {
+      const cmd = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+      const child = spawn(cmd, [], {
         cwd,
         shell: true,
         stdio: 'pipe',

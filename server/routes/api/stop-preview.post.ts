@@ -1,5 +1,5 @@
-import { defineHandler, createError } from "nitro";
-import { readBody } from "nitro/h3";
+import { defineHandler } from "nitro";
+import { readBody, createError } from "nitro/h3";
 import { projectServerManager } from "../../services/ProjectServerManager";
 
 export default defineHandler(async (event) => {
