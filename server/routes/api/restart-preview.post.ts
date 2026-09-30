@@ -32,9 +32,21 @@ export default defineHandler(async (event) => {
     };
   } catch (error: any) {
     console.error('Failed to restart preview:', error);
+    const info = projectServerManager.getStatus(projectId);
     throw createError({
       statusCode: 500,
       statusMessage: error.message || 'Failed to restart preview',
+      data: {
+        diagnostics: info ? {
+          stdout: info.stdout,
+          stderr: info.stderr,
+          npmInstallError: info.npmInstallError,
+          npmInstallExitCode: info.npmInstallExitCode,
+          npmRunDevError: info.npmRunDevError,
+          processExitCode: info.processExitCode,
+          error: info.error,
+        } : undefined,
+      },
     });
   }
 });

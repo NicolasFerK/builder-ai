@@ -17,7 +17,6 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
 
-  // Function to start or fetch preview status
   const startPreview = useCallback(async () => {
     setStatus('loading');
     setError(null);
@@ -31,7 +30,10 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.statusMessage || 'Failed to start preview');
+        // If the error is a 500, it should contain diagnostics in data.data.diagnostics
+        const diagnosticError = data.data?.diagnostics?.error || data.diagnostics?.error;
+        const errorMessage = diagnosticError || data.statusMessage || 'Failed to start preview';
+        throw new Error(errorMessage);
       }
 
       if (data.status === 'error') {
@@ -62,7 +64,10 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.statusMessage || 'Failed to restart preview');
+        // If the error is a 500, it should contain diagnostics in data.data.diagnostics
+        const diagnosticError = data.data?.diagnostics?.error || data.diagnostics?.error;
+        const errorMessage = diagnosticError || data.statusMessage || 'Failed to restart preview';
+        throw new Error(errorMessage);
       }
 
       if (data.status === 'error') {
