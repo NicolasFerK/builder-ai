@@ -1,1 +1,130 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';\nimport { AISettings } from '@/types';\n\ninterface SettingsContextType {\n  settings: AISettings & { publicPreviewUrl?: string };\n  updateSettings: (newSettings: Partial<AISettings>) => void;\n  updatePublicPreviewUrl: (url: string | undefined) => Promise<void>;\n  resetSettings: () => void;\n  isLoaded: boolean;\n}\n\nconst SettingsContext = createContext<SettingsContextType | undefined>(undefined);\n\nexport const SettingsProvider = ({ children }: { children: ReactNode }) => {\n  const [settings, setSettings] = useState<AISettings & { publicPreviewUrl?: string }>({ \n    apiUrl: '', \n    theme: 'light', \n    viewMode: 'desktop' \n  });\n  const [isLoaded, setIsLoaded] = useState(false);\n\n  useEffect(() => {\n    const loadSettings = async () => {\n      try {\n        const response = await fetch('/api/config');\n        if (response.ok) {\n          const config = await response.json();\n          setSettings({ \n            ...config.aisettings, \n            publicPreviewUrl: config.publicPreviewUrl \n          });\n        }\n      } catch (error) {\n        console.error('Failed to load settings from server:', error);\n      } finally {\n        setIsLoaded(true);\n      }\n    };\n\n    loadSettings();\n  }, []);\n\n  const updateSettings = async (newSettings: Partial<AISettings>) => {\n    // Optimistic update\n    const previousSettings = { ...settings };\n    setSettings((prev) => ({ ...prev, ...newSettings }));\n\n    try {\n      const response = await fetch('/api/config', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ aisettings: newSettings }),\n      });\n\n      if (!response.ok) {\n        throw new Error('Failed to save settings');\n      }\n    } catch (error) {\n      console.error('Failed to update settings:', error);\n      setSettings(previousSettings);\n      throw error;\n    }\n  };\n\n  const updatePublicPreviewUrl = async (url: string | undefined) => {\n    // Optimistic update\n    const previousUrl = settings.publicPreviewUrl;\n    setSettings((prev) => ({ ...prev, publicPreviewUrl: url }));\n\n    try {\n      const response = await fetch('/api/config', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ publicPreviewUrl: url }),\n      });\n\n      if (!response.ok) {\n        throw new Error('Failed to save preview URL');\n      }\n    } catch (error) {\n      console.error('Failed to update preview URL:', error);\n      setSettings((prev) => ({ ...prev, publicPreviewUrl: previousUrl }));\n      throw error;\n    }\n  };\n\n  const resetSettings = async () => {\n    const defaultAISettings: AISettings = { apiUrl: '', theme: 'light', viewMode: 'desktop' };\n    // Optimistic update\n    const previousSettings = { ...settings };\n    setSettings({ ...defaultAISettings, publicPreviewUrl: undefined });\n\n    try {\n      // We can't easily reset EVERYTHING via one call if we want to keep publicPreviewUrl unless we send it too\n      // But let's just reset AISettings\n      await fetch('/api/config', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ aisettings: defaultAISettings }),\n      });\n    } catch (error) {\n      console.error('Failed to reset settings:', error);\n      setSettings(previousSettings);\n    }\n  };\n\n  return (\n    <SettingsContext.Provider value={{ settings, updateSettings, updatePublicPreviewUrl, resetSettings, isLoaded }}>\n      {children}\n    </SettingsContext.Provider>\n  );\n};\n\nexport const useSettings = () => {\n  const context = useContext(SettingsContext);\n  if (context === undefined) {\n    throw new Error('useSettings must be used within a SettingsProvider');\n  }\n  return context;\n};\n
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { AISettings } from '@/types';
+
+interface SettingsContextType {
+  settings: AISettings & { publicPreviewUrl?: string };
+  updateSettings: (newSettings: Partial<AISettings>) => void;
+  updatePublicPreviewUrl: (url: string | undefined) => Promise<void>;
+  resetSettings: () => void;
+  isLoaded: boolean;
+}
+
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
+const DEFAULT_SETTINGS: AISettings & { publicPreviewUrl?: string } = {
+  apiUrl: '',
+  theme: 'light',
+  viewMode: 'desktop',
+  publicPreviewUrl: undefined
+};
+
+export const SettingsProvider = ({ children }: { children: ReactNode }) => {
+  const [settings, setSettings] = useState<AISettings & { publicPreviewUrl?: string }>(DEFAULT_SETTINGS);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          setSettings({ 
+            apiUrl: config.aisettings?.apiUrl ?? DEFAULT_SETTINGS.apiUrl,
+            theme: config.aisettings?.theme ?? DEFAULT_SETTINGS.theme,
+            viewMode: config.aisettings?.viewMode ?? DEFAULT_SETTINGS.viewMode,
+            apiKey: config.aisettings?.apiKey,
+            modelName: config.aisettings?.modelName,
+            publicPreviewUrl: config.publicPreviewUrl 
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load settings from server:', error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  const updateSettings = async (newSettings: Partial<AISettings>) => {
+    // Optimistic update
+    const previousSettings = { ...settings };
+    setSettings((prev) => ({ ...prev, ...newSettings }));
+
+    try {
+      const response = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aisettings: newSettings }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      setSettings(previousSettings);
+      throw error;
+    }
+  };
+
+  const updatePublicPreviewUrl = async (url: string | undefined) => {
+    // Optimistic update
+    const previousUrl = settings.publicPreviewUrl;
+    setSettings((prev) => ({ ...prev, publicPreviewUrl: url }));
+
+    try {
+      const response = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicPreviewUrl: url }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save preview URL');
+      }
+    } catch (error) {
+      console.error('Failed to update preview URL:', error);
+      setSettings((prev) => ({ ...prev, publicPreviewUrl: previousUrl }));
+      throw error;
+    }
+  };
+
+  const resetSettings = async () => {
+    // Optimistic update
+    const previousSettings = { ...settings };
+    setSettings(DEFAULT_SETTINGS);
+
+    try {
+      // We can't easily reset EVERYTHING via one call if we want to keep publicPreviewUrl unless we send it too
+      // But let's just reset AISettings
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aisettings: { 
+          apiUrl: '', 
+          theme: 'light', 
+          viewMode: 'desktop' 
+        } }),
+      });
+    } catch (error) {
+      console.error('Failed to reset settings:', error);
+      setSettings(previousSettings);
+    }
+  };
+
+  return (
+    <SettingsContext.Provider value={{ settings, updateSettings, updatePublicPreviewUrl, resetSettings, isLoaded }}>
+      {children}
+    </SettingsContext.Provider>
+  );
+};
+
+export const useSettings = () => {
+  const context = useContext(SettingsContext);
+  if (context === undefined) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
+};

@@ -7,6 +7,17 @@ export interface AppConfig {
   publicPreviewUrl?: string;
 }
 
+const DEFAULT_AISettings: AISettings = {
+  apiUrl: '',
+  theme: 'light',
+  viewMode: 'desktop'
+};
+
+const DEFAULT_CONFIG: AppConfig = {
+  aisettings: { ...DEFAULT_AISettings },
+  publicPreviewUrl: undefined
+};
+
 const CONFIG_FILE = path.join(process.cwd(), 'server', 'config.json');
 
 export class ConfigService {
@@ -27,26 +38,23 @@ export class ConfigService {
 
     try {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
-      this.config = JSON.parse(content);
+      const parsed = JSON.parse(content);
+      
+      // Merge loaded config with defaults to ensure completeness
+      this.config = {
+        aisettings: {
+          ...DEFAULT_AISettings,
+          ...(parsed.aisettings || {}),
+        },
+        publicPreviewUrl: parsed.publicPreviewUrl
+      };
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        this.config = {
-          aisettings: {
-            apiUrl: '',
-            theme: 'light',
-            viewMode: 'desktop'
-          }
-        };
+        this.config = { ...DEFAULT_CONFIG };
         await this.save(this.config);
       } else {
         console.error('[ConfigService] Error loading config:', error);
-        this.config = {
-          aisettings: {
-            apiUrl: '',
-            theme: 'light',
-            viewMode: 'desktop'
-          }
-        };
+        this.config = { ...DEFAULT_CONFIG };
       }
     }
     return this.config;
@@ -54,7 +62,14 @@ export class ConfigService {
 
   async save(newConfig: Partial<AppConfig>): Promise<AppConfig> {
     const currentConfig = await this.load();
-    const updatedConfig = { ...currentConfig, ...newConfig };
+    const updatedConfig = { 
+      ...currentConfig, 
+      ...newConfig,
+      aisettings: {
+        ...currentConfig.aisettings,
+        ...(newConfig.aisettings || {})
+      }
+    };
     
     try {
       await fs.mkdir(path.dirname(CONFIG_FILE), { recursive: true });
