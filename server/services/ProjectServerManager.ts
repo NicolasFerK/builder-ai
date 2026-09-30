@@ -256,14 +256,91 @@ class ProjectServerManager {
       child.stdout?.on('data', (data) => {
         const output = data.toString();
         info.stdout += output;
-        if (output.includes('ready in') || output.includes('VITE v')) {\n           info.status = 'running';\n        }\n      });
+        if (output.includes('ready in') || output.includes('VITE v')) {
+           info.status = 'running';
+        }
+      });
 
       child.stderr?.on('data', (data) => {
         const output = data.toString();
-        info.stderr += output;\n        if (output.toLowerCase().includes('error')) {\n          info.status = 'error';\n          info.npmRunDevError = output.trim();\n        }\n      });
+        info.stderr += output;
+        if (output.toLowerCase().includes('error')) {
+          info.status = 'error';
+          info.npmRunDevError = output.trim();
+        }
+      });
 
-      child.on('error', (err) => {\n        info.status = 'error';\n        info.error = err.message;\n      });
+      child.on('error', (err) => {
+        info.status = 'error';
+        info.error = err.message;
+      });
 
-      child.on('exit', (code) => {\n        info.processExitCode = code;\n        info.status = code === 0 ? 'stopped' : 'error';\n        info.process = null;\n      });
+      child.on('exit', (code) => {
+        info.processExitCode = code;
+        info.status = code === 0 ? 'stopped' : 'error';
+        info.process = null;
+      });
 
-      return info;\n    } catch (error: any) {\n      console.error(`[PREVIEW] [${projectId}] failed to start:`, error);\n      info.status = 'error';\n      info.error = error.message;\n      return info;\n    }\n  }\n\n  async waitForReady(projectId: string, timeoutMs = 30000): Promise<boolean> {\n    const info = this.projects.get(projectId);\n    if (!info) return false;\n    return this.waitForPort(info.port, timeoutMs);\n  }\n\n  private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {\n    return new Promise((resolve, reject) => {\n      const child = spawn(command, args, {\n        cwd,\n        shell: true,\n        stdio: 'pipe',\n      });\n      let stderr = '';\n      child.stderr?.on('data', (data) => {\n        stderr += data.toString();\n      });\n      child.on('close', (code) => {\n        if (code === 0) resolve();\n        else {\n          const err = new Error(stderr || `Command ${command} exited with code ${code}`);\n          (err as any).exitCode = code;\n          (err as any).stderr = stderr;\n          reject(err);\n        }\n      });\n      child.on('error', reject);\n    });\n  }\n\n  async stop(projectId: string) {\n    const info = this.projects.get(projectId);\n    if (info && info.process) {\n      info.process.kill();\n      info.status = 'stopped';\n      info.process = null;\n    }\n  }\n\n  async restart(projectId: string) {\n    await this.stop(projectId);\n    return this.start(projectId);\n  }\n\n  getStatus(projectId: string): ProjectInfo | undefined {\n    return this.projects.get(projectId);\n  }\n\n  getUrl(projectId: string): string | undefined {\n    return this.projects.get(projectId)?.url;\n  }\\n}\n\nexport const projectServerManager = new ProjectServerManager();\n
+      return info;
+    } catch (error: any) {
+      console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
+      info.status = 'error';
+      info.error = error.message;
+      return info;
+    }
+  }
+
+  async waitForReady(projectId: string, timeoutMs = 30000): Promise<boolean> {
+    const info = this.projects.get(projectId);
+    if (!info) return false;
+    return this.waitForPort(info.port, timeoutMs);
+  }
+
+  private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        cwd,
+        shell: true,
+        stdio: 'pipe',
+      });
+      let stderr = '';
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else {
+          const err = new Error(stderr || `Command ${command} exited with code ${code}`);
+          (err as any).exitCode = code;
+          (err as any).stderr = stderr;
+          reject(err);
+        }
+      });
+      child.on('error', reject);
+    });
+  }
+
+  async stop(projectId: string) {
+    const info = this.projects.get(projectId);
+    if (info && info.process) {
+      info.process.kill();
+      info.status = 'stopped';
+      info.process = null;
+    }
+  }
+
+  async restart(projectId: string) {
+    await this.stop(projectId);
+    return this.start(projectId);
+  }
+
+  getStatus(projectId: string): ProjectInfo | undefined {
+    return this.projects.get(projectId);
+  }
+
+  getUrl(projectId: string): string | undefined {
+    return this.projects.get(projectId)?.url;
+  }
+}
+
+export const projectServerManager = new ProjectServerManager();

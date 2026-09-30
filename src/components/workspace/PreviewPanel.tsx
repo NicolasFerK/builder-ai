@@ -105,7 +105,7 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
     <div className='flex flex-col h-full bg-muted/30'>
       <div className='p-2 border-b flex items-center justify-between bg-background'>
         <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span\>
+          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
         </div>
         <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
           <Button 
