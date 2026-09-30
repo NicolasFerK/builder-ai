@@ -25,13 +25,9 @@ export default defineHandler(async (event) => {
       throw new Error('Vite server started but failed to become ready within the timeout.');
     }
 
-    let finalUrl = info.url;
-    const publicBaseUrl = process.env.PREVIEW_PUBLIC_BASE_URL;
-    if (publicBaseUrl && info.port === 5173) {
-      const base = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
-      finalUrl = `${base}/`;
-    }
-
+    // If the status is error, we return the internal URL to avoid serving a public URL that doesn't work.
+    const finalUrl = info.status === 'error' ? info.internalUrl : info.publicUrl;
+    
     return {
       success: true,
       projectId,
@@ -47,17 +43,17 @@ export default defineHandler(async (event) => {
       statusMessage: error.message || 'Failed to start preview',
       data: {
         diagnostics: info ? {
-        stdout: info.stdout,
-        stderr: info.stderr,
-        npmInstallError: info.npmInstallError,
-        npmInstallExitCode: info.npmInstallExitCode,
-        npmRunDevError: info.npmRunDevError,
-        processExitCode: info.processExitCode,
-        processSignal: info.processSignal,
-        command: info.command,
-        cwd: info.cwd,
-        error: info.error,
-      } : undefined,
+          stdout: info.stdout,
+          stderr: info.stderr,
+          npmInstallError: info.npmInstallError,
+          npmInstallExitCode: info.npmInstallExitCode,
+          npmRunDevError: info.npmRunDevError,
+          processExitCode: info.processExitCode,
+          processSignal: info.processSignal,
+          command: info.command,
+          cwd: info.cwd,
+          error: info.error,
+        } : undefined,
       },
     });
   }

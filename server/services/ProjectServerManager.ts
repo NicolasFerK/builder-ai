@@ -6,7 +6,8 @@ import net from 'net';
 export interface ProjectInfo {
   process: ChildProcess | null;
   port: number;
-  url: string;
+  internalUrl: string;
+  publicUrl: string;
   status: 'running' | 'starting' | 'stopped' | 'error';
   projectPath: string;
   stdout: string;
@@ -121,6 +122,15 @@ class ProjectServerManager {
     return false;
   }
 
+  private getPublicUrl(port: number): string {
+    const publicBaseUrl = process.env.PREVIEW_PUBLIC_BASE_URL;
+    if (!publicBaseUrl) {
+      return `http://127.0.0.1:${port}`;
+    }
+    const base = publicBaseUrl.endsWith('/') ? publicBaseUrl.slice(0, -1) : publicBaseUrl;
+    return `${base}/`;
+  }
+
   async start(projectId: string): Promise<ProjectInfo> {
     // 1. Check if project is already being managed
     if (this.projects.has(projectId)) {
@@ -132,13 +142,15 @@ class ProjectServerManager {
 
     const projectPath = path.join(this.projectsRoot, projectId);
     const port = this.PREVIEW_PORT;
-    const url = `http://127.0.0.1:${port}`;
+    const internalUrl = `http://127.0.0.1:${port}`;
+    const publicUrl = this.getPublicUrl(port);
 
     // 2. Create the project info entry IMMEDIATELY to prevent race conditions
     const info: ProjectInfo = {
       process: null,
       port,
-      url,
+      internalUrl,
+      publicUrl,
       status: 'starting',
       projectPath,
       stdout: '',
@@ -178,7 +190,7 @@ class ProjectServerManager {
         throw new Error(errorMsg);
       }
 
-      console.log('[PREVIEW] starting project', { projectId, projectPath, port, url });
+      console.log('[PREVIEW] starting project', { projectId, projectPath, port, publicUrl });
 
       // 5. Package Manager & Dependencies
       const { manager: pkgManager, conflict } = await this.getPackageManager(projectPath);
@@ -237,7 +249,7 @@ class ProjectServerManager {
       info.command = command;
       info.cwd = projectPath;
 
-      console.log(`[PREVIEW] Executing command: "${command}" in ${projectPath}`);
+      console.log(`[PREVIEW] Executing command: \"${command}\" in ${projectPath}`);
 
       const child = spawn(command, [], {
         cwd: projectPath,
@@ -278,7 +290,7 @@ class ProjectServerManager {
       });
 
       // 7. Wait for the port to actually be responsive
-      const isReady = await this.waitForReady(port, 15000);
+      const isReady = await this.waitForReady(projectId, 15000);
       if (!isReady) {
         console.error(`[PREVIEW] Vite failed to become responsive on port ${port} within 15 seconds.`);
         
@@ -304,7 +316,7 @@ class ProjectServerManager {
           `Installation Error: ${info.npmInstallError || 'None'}`,
           `Dev Server Stdout: ${info.stdout.slice(-500)}`, // last 500 chars
           `Dev Server Stderr: ${info.stderr.slice(-500)}`, // last 500 chars
-        ].join('\n');
+        ].join('\\n');
         
         throw new Error(diagnostics);
       }
@@ -385,7 +397,7 @@ class ProjectServerManager {
   }
 
   getUrl(projectId: string): string | undefined {
-    return this.projects.get(projectId)?.url;
+    return this.projects.get(projectId)?.publicUrl;
   }
 }
 
