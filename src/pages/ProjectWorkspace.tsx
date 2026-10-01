@@ -179,28 +179,28 @@ export default function ProjectWorkspace() {
                     </div >
                     <div className='flex items-center gap-2'>
                       <Button
-                        variant=\"ghost\"
-                        size=\"icon\"
-                        className=\"h-8 w-8\"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={handleUpdateRemotePreview}
                         disabled={isUpdatingRemote}
-                        title=\"Atualizar Preview Remoto\"
+                        title="Atualizar Preview Remoto"
                       >
-                        {isUpdatingRemote ? <Loader2 className=\"h-4 w-4 animate-spin\" /> : <CloudUpload className=\"h-4 w-4\" />}
+                        {isUpdatingRemote ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
                       </Button>
                       <Button
-                        variant=\"ghost\"
-                        size=\"icon\"
-                        className=\"h-8 w-8\"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={handleExportProject}
-                        title=\"Exportar projeto\"
+                        title="Exportar projeto"
                       >
-                        <Download className=\"h-4 w-4\" />
+                        <Download className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant=\"ghost\" size=\"icon\" className=\"h-8 w-8\">
-                            <RefreshCcw className=\"h-4 w-4\" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <RefreshCcw className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
