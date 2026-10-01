@@ -1,110 +1,80 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Monitor, Smartphone, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Monitor, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
 import { FileNode } from '@/types';
+import { SandpackProvider, SandpackPreview } from "@codesandbox/sandpack-react";
 
 interface PreviewPanelProps {
   projectId: string;
   files: FileNode[];
 }
 
+/**
+ * Flattens a FileNode tree into a flat object of file paths and contents.
+ */
+function flattenFiles(nodes: FileNode[], base: string = ""): Record<string, string> {
+  let flat: Record<string, string> = {};
+  for (const node of nodes) {
+    const path = base + (base ? "/" : "") + node.name;
+    if (node.type === 'file') {
+      if (node.content !== undefined) {
+        flat[path] = node.content;
+      }
+    } else if (node.type === 'folder' && node.children) {
+      Object.assign(flat, flattenFiles(node.children, path));
+    }
+  }
+  return flat;
+}
+
 export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
   const { settings, updateSettings } = useSettings();
-  const [status, setStatus] = useState<'loading' | 'running' | 'error' | 'not_found'>('loading');
-  const [port, setPort] = useState<number | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
-  const [iframeKey, setIframeKey] = useState(0);
 
-  const startPreview = useCallback(async () => {
-    setStatus('loading');
-    setError(null);
-    try {
-      const response = await fetch('/api/start-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
+  // Prepare Sandpack files: flatten the tree and remove the package.json from the files object
+  // as its dependencies will be handled in customSetup.
+  const sandpackFiles = useMemo(() => {
+    const flat = flattenFiles(files);
+    delete flat['package.json'];
+    return flat;
+  }, [files]);
 
-      const data = await response.json();
+  // Prepare Sandpack customSetup: extract dependencies from package.json in the files list
+  const sandpackCustomSetup = useMemo(() => {
+    // We search for the package.json node in the original files array
+    // Since the files might be a tree, we need a helper to find it or just flatten and look.
+    // Let's use a simpler approach: flatten everything and look for package.json.
+    const allFiles = flattenFiles(files);
+    const pkgContent = allFiles['package.json'];
 
-      if (!response.ok) {
-        // If the error is a 500, it should contain diagnostics in data.data.diagnostics
-        const diagnosticError = data.data?.diagnostics?.error || data.diagnostics?.error;
-        const errorMessage = diagnosticError || data.statusMessage || 'Failed to start preview';
-        throw new Error(errorMessage);
+    if (pkgContent) {
+      try {
+        const pkg = JSON.parse(pkgContent);
+        const dependencies = {
+          ...(pkg.dependencies || {}),
+          ...(pkg.devDependencies || {}),
+        };
+
+        // Remove vite, @vitejs/plugin-react, and any @types packages from the dependency list
+        Object.keys(dependencies).forEach((dep) => {
+          if (
+            dep.includes('vite') || 
+            dep.includes('@vitejs/plugin-react') || 
+            dep.includes('@types/')
+          ) {
+            delete dependencies[dep];
+          }
+        });
+
+        return {
+          dependencies,
+        };
+      } catch (error) {
+        console.error('[PREVIEW] Failed to parse package.json for Sandpack setup:', error);
       }
-
-      if (data.status === 'error') {
-        throw new Error(data.diagnostics?.error || 'Server reported an error');
-      }
-
-      setPort(data.port);
-      setPreviewUrl(data.url);
-      setStatus('running');
-    } catch (err: any) {
-      console.error('[PREVIEW] Error starting preview:', err);
-      setError(err.message);
-      setStatus('error');
     }
-  }, [projectId]);
-
-  // Function to restart preview
-  const restartPreview = useCallback(async () => {
-    setStatus('loading');
-    setError(null);
-    try {
-      const response = await fetch('/api/restart-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // If the error is a 500, it should contain diagnostics in data.data.diagnostics
-        const diagnosticError = data.data?.diagnostics?.error || data.diagnostics?.error;
-        const errorMessage = diagnosticError || data.statusMessage || 'Failed to restart preview';
-        throw new Error(errorMessage);
-      }
-
-      if (data.status === 'error') {
-        throw new Error(data.diagnostics?.error || 'Server reported an error');
-      }
-
-      setPort(data.port);
-      setPreviewUrl(data.url);
-      setStatus('running');
-      setIframeKey(prev => prev + 1);
-    } catch (err: any) {
-      console.error('[PREVIEW] Error restarting preview:', err);
-      setError(err.message);
-      setStatus('error');
-    }
-  }, [projectId]);
-
-  // Initial start
-  useEffect(() => {
-    if (projectId) {
-      startPreview();
-    }
-  }, [projectId, startPreview]);
-
-  // Reload iframe when files change (debounced)
-  useEffect(() => {
-    if (status === 'running' && port) {
-      const timer = setTimeout(() => {
-        setIframeKey(prev => prev + 1);
-      }, 1000); // debounce reload for 1s after last file change
-      return () => clearTimeout(timer);
-    }
-  }, [files, status, port]);
-
-  const handleRefresh = () => {
-    restartPreview();
-  };
+    return {};
+  }, [files]);
 
   return (
     <div className='flex flex-col h-full bg-muted/30'>
@@ -129,16 +99,6 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
           >
             <Smartphone className='w-4 h-4' />
           </Button>
-          <div className='w-px h-4 bg-muted-foreground/20 mx-1' />
-          <Button 
-            variant='ghost' 
-            size='icon' 
-            className='h-7 w-7'
-            onClick={handleRefresh}
-            disabled={status === 'loading'}
-          >
-            <RefreshCw className={`h-4 w-4 ${status === 'loading' ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
       </div>
       
@@ -148,39 +108,17 @@ export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
             ? 'w-[375px] h-[667px]' 
             : 'w-full h-full max-w-5xl'
         }`}>
-          {status === 'loading' && (
-            <div className='w-full h-full flex flex-col items-center justify-center gap-4 text-muted-foreground'>
-              <Loader2 className='w-12 h-12 animate-spin opacity-20' />
-              <p className='text-sm font-medium'>Initializing preview environment...</p>
-            </div>
-          )}
-
-          {status === 'error' && (
-            <div className='w-full h-full flex flex-col items-center justify-center gap-4 p-8 text-center'>
-              <div className='p-3 bg-destructive/10 rounded-full'>
-                <AlertCircle className='w-10 h-10 text-destructive' />
-              </div>
-              <div className='space-y-2'>
-                <h3 className='text-lg font-semibold text-foreground'>Preview Failed</h3>
-                <p className='text-sm text-muted-foreground max-w-xs mx-auto'>
-                  {error || 'An unexpected error occurred while starting the preview server.'}
-                </p>
-              </div>
-              <Button onClick={startPreview} variant='outline' className='mt-2'>
-                Try Again
-              </Button>
-            </div>
-          )}
-
-          {status === 'running' && previewUrl && (
-            <iframe
-              key={iframeKey}
-              src={previewUrl}
-              className='w-full h-full border-none'
-              title="Project Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          <SandpackProvider
+            template="vite-react"
+            files={sandpackFiles}
+            customSetup={sandpackCustomSetup}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <SandpackPreview 
+              showOpenInCodeSandbox={false} 
+              showRefreshButton 
             />
-          )}
+          </SandpackProvider>
         </div>
       </div>
     </div>
