@@ -9,7 +9,8 @@ import { FileNode } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useSettings } from '@/context/SettingsContext';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, Download } from 'lucide-react';
+import JSZip from 'jszip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,34 @@ export default function ProjectWorkspace() {
       </div >
     );
   }
+
+  const handleExportProject = async () => {
+    try {
+      const zip = new JSZip();
+      
+      const addFilesToZip = (nodes: any[], path: string) => {
+        for (const node of nodes) {
+          const currentPath = path ? `${path}/${node.name}` : node.name;
+          if (node.type === 'file') {
+            zip.file(currentPath, node.content || '');
+          } else if (node.type === 'folder' && node.children) {
+            addFilesToZip(node.children, currentPath);
+          }
+        }
+      };
+
+      addFilesToZip(currentProject.files, '');
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      link.download = `${currentProject.name.replace(/\s+/g, '_').toLowerCase()}_project.zip`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('Failed to export project:', error);
+    }
+  };
 
   const handleFileSelect = (file: FileNode) => {
     setSelectedFile(file);
@@ -78,27 +107,38 @@ export default function ProjectWorkspace() {
                     <div className='text-xs text-muted-foreground'>
                       {currentProject.name}
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <RefreshCcw className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Reload Site?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to reload the entire application?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => window.location.reload()}>
-                            Reload
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className='flex items-center gap-2'>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleExportProject}
+                        title="Exportar projeto"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <RefreshCcw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reload Site?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to reload the entire application?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => window.location.reload()}>
+                              Reload
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div >
                   </div>
                 </div>
                 <TabsContent value='preview' className='flex-1 m-0 overflow-hidden'>
