@@ -1,7 +1,10 @@
 {
   "aisettings": {
-    "apiUrl": "",
+    "apiUrl": "https://1pfzw7mx248vsr-8000.proxy.runpod.net/v1/chat/completions",
     "theme": "light",
-    "viewMode": "desktop"
-  }
+    "viewMode": "desktop",
+    "apiKey": "",
+    "modelName": "google/gemma-4-26B-A4B-it"
+  },
+  "publicPreviewUrl": "https://1pfzw7mx248vsr-5173.proxy.runpod.net/"
 }
