@@ -341,22 +341,22 @@ const SettingsPage = () => {
                   <div className="flex gap-2">
                     <Input
                       id="previewUrl"
-                      type=\"url\"
-                      placeholder=\"https://your-runpod-proxy.net/\"
+                      type="url"
+                      placeholder="https://your-runpod-proxy.net/"
                       value={previewUrl}
                       onChange={(e) => setPreviewUrl(e.target.value.trim())}
-                      className=\"flex-1\"
+                      className="flex-1"
                     />
                     <Button 
-                      type=\"button\" 
-                      variant=\"outline\" 
+                      type="button" 
+                      variant="outline" 
                       onClick={handleTestConnection}
                       disabled={isTesting || !previewUrl}
                     >
-                      {isTesting ? <Loader2 className=\"w-4 h-4 animate-spin\" /> : <Globe className=\"w-4 h-4" />}
-                      <span className=\"ml-2\">Test</span>
+                      {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                      <span className="ml-2">Test</span>
                     </Button>
                   </div>
-                  <p className=\"text-xs text-muted-foreground\">\n                    The address used for the project preview iframe.\n                  </p>
+                  <p className="text-xs text-muted-foreground">\n                    The address used for the project preview iframe.\n                  </p>
                 </div>
-                <div className=\"flex gap-2\">\n                  <Button \n                    type=\"button\" \n                    onClick={handlePreviewUrlSave}\n                    className=\"flex-1 gap-2\"\n                  >\n                    <Save className=\"w-4 h-4\" />\n                    Save URL\n                  </Button>\n                </div>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n      </Tabs>\n\n      <div className=\"mt-8 flex justify-between items-center text-sm text-muted-foreground\">\n        <span>Note: These settings are stored on the server.</span>\n        <Button \n          variant=\"outline\" \n          size=\"sm\" \n          onClick={handleReset}\n          className=\"text-destructive hover:text-destructive hover:bg-destructive/10\"\n        >\n          <RefreshCcw className=\"w-4 h-4 mr-2\" />\n          Reset All Settings\n        </Button>\n      </div>\n\n      <Card className=\"mt-8\">\n        <CardHeader>\n          <CardTitle>System</CardTitle>\n          <CardDescription>\n            Reload the application to ensure all changes are applied correctly.\n          </CardDescription>\n        </CardHeader>\n        <CardContent>\n          <AlertDialog>\n            <AlertDialogTrigger asChild>\n              <Button variant=\"outline\" className=\"w-full gap-2\">\n                <RefreshCcw className=\"w-4 h-4\" />\n                Reload Site\n              </Button>\n            </AlertDialogTrigger>\n            <AlertDialogContent>\n              <AlertDialogHeader>\n                <AlertDialogTitle>Are you sure?</AlertDialogTitle>\n                <AlertDialogDescription>\n                  This will reload the entire application. Any unsaved changes in the current session might be lost.\n                </AlertDialogDescription>\n              </AlertDialogHeader>\n              <AlertDialogFooter>\n                <AlertDialogCancel>Cancel</AlertDialogCancel>\n                <AlertDialogAction onClick={() => window.location.reload()}>\n                  Reload\n                </AlertDialogAction>\n              </AlertDialogFooter>\n            </AlertDialogContent>\n          </AlertDialog>\n        </CardContent>\n      </Card>\n    </div>\n  );\n};\n\nexport default SettingsPage;\n
+                <div className="flex gap-2">\n                  <Button \n                    type="button" \n                    onClick={handlePreviewUrlSave}\n                    className="flex-1 gap-2"\n                  >\n                    <Save className="w-4 h-4" />\n                    Save URL\n                  </Button>\n                </div>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n      </Tabs>\n\n      <div className="mt-8 flex justify-between items-center text-sm text-muted-foreground">\n        <span>Note: These settings are stored on the server.</span>\n        <Button \n          variant="outline" \n          size="sm" \n          onClick={handleReset}\n          className="text-destructive hover:text-destructive hover:bg-destructive/10"\n        >\n          <RefreshCcw className="w-4 h-4 mr-2" />\n          Reset All Settings\n        </Button>\n      </div>\n\n      <Card className="mt-8">\n        <CardHeader>\n          <CardTitle>System</CardTitle>\n          <CardDescription>\n            Reload the application to ensure all changes are applied correctly.\n          </CardDescription>\n        </CardHeader>\n        <CardContent>\n          <AlertDialog>\n            <AlertDialogTrigger asChild>\n              <Button variant="outline" className="w-full gap-2">\n                <RefreshCcw className="w-4 h-4" />\n                Reload Site\n              </Button>\n            </AlertDialogTrigger>\n            <AlertDialogContent>\n              <AlertDialogHeader>\n                <AlertDialogTitle>Are you sure?</AlertDialogTitle>\n                <AlertDialogDescription>\n                  This will reload the entire application. Any unsaved changes in the current session might be lost.\n                </AlertDialogDescription>\n              </AlertDialogHeader>\n              <AlertDialogFooter>\n                <AlertDialogCancel>Cancel</AlertDialogCancel>\n                <AlertDialogAction onClick={() => window.location.reload()}>\n                  Reload\n                </AlertDialogAction>\n              </AlertDialogFooter>\n            </AlertDialogContent>\n          </AlertDialog>\n        </CardContent>\n      </Card>\n    </div>\n  );\n};\n\nexport default SettingsPage;\n
