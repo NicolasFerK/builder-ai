@@ -1,6 +1,6 @@
 import { defineHandler } from "nitro";
 import { readBody, createError } from "nitro/h3";
-import { configService } from "../services/ConfigService";
+import { configService } from "../../services/ConfigService";
 
 export default defineHandler(async (event) => {
   const body = await readBody<any>(event);
