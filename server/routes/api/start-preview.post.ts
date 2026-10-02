@@ -20,11 +20,13 @@ export default defineHandler(async (event) => {
     
     if (info.status === 'error') {
       return {
-        success: true,
+        success: false,
         projectId,
         port: info.port,
         url: info.internalUrl,
         status: info.status,
+        error: info.error,
+        statusMessage: info.error,
       };
     }
 

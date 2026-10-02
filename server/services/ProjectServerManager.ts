@@ -153,10 +153,13 @@ class ProjectServerManager {
     return `${base}/`;
   }
 
+  private isDirectoryInside(parent: string, child: string): boolean {
+    const relative = path.relative(parent, child);
+    return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+  }
+
   private async cleanupOrphanProcess(port: number): Promise<boolean> {
     try {
-      // Use ss to find processes listening on the specific port.
-      // 'ss -lptn sport = :<port>' returns lines with process info.
       const { stdout: ssStdout } = await execPromise(`ss -lptn 'sport = :${port}'`);
       if (!ssStdout.trim()) return false;
 
@@ -164,50 +167,70 @@ class ProjectServerManager {
       let anyKilled = false;
 
       for (const line of lines) {
-        // Parse PID from something like: users:(("node",pid=1234,fd=45))
         const pidMatch = line.match(/pid=(\d+)/);
         if (!pidMatch) continue;
         const pid = parseInt(pidMatch[1], 10);
 
-        // Verify ownership via CWD and Command
+        let pgid = -1;
         let cwd = '';
+        let command = '';
+
         try {
-          // readlink -f /proc/<pid>/cwd is a reliable way to get the real CWD on Linux
+          const { stdout: psStdout } = await execPromise(`ps -p ${pid} -o pgid=,args=`);
+          const parts = psStdout.trim().split(/\s+/);
+          if (parts.length < 2) continue;
+          pgid = parseInt(parts[0], 10);
+          command = parts.slice(1).join(' ');
+
           const { stdout: cwdStdout } = await execPromise(`readlink -f /proc/${pid}/cwd`);
           cwd = cwdStdout.trim();
         } catch (e) {
-          // Could not get CWD, skip this PID
           continue;
         }
 
-        let command = '';
-        try {
-          const { stdout: cmdStdout } = await execPromise(`ps -p ${pid} -o args=`);
-          command = cmdStdout.trim();
-        } catch (e) {
-          // Could not get command, skip this PID
-          continue;
-        }
-
-        const isInsideProjects = cwd.startsWith(this.projectsRoot);
+        const isInsideProjects = this.isDirectoryInside(this.projectsRoot, cwd);
         const isDevServer = /vite|npm|pnpm|yarn/i.test(command);
 
         if (isInsideProjects && isDevServer) {
-          console.log(`[PREVIEW] Detected BuilderAI orphan process: PID ${pid}, CWD: ${cwd}, CMD: ${command}`);
+          console.log(`[PREVIEW] Detected BuilderAI orphan process: PID ${pid}, PGID ${pgid}, CWD: ${cwd}, CMD: ${command}`);
           
-          try {
-            // Try SIGTERM to the process group first (since we use detached: true)
-            process.kill(-pid, 'SIGTERM');
-          } catch (e: any) {
-            try { process.kill(pid, 'SIGTERM'); } catch {}
+          let shouldKillGroup = false;
+          if (pid === pgid) {
+            shouldKillGroup = true;
+          } else {
+            try {
+              const { stdout: leaderPsStdout } = await execPromise(`ps -p ${pgid} -o args=`);
+              const leaderCommand = leaderPsStdout.trim();
+              const { stdout: leaderCwdStdout } = await execPromise(`readlink -f /proc/${pgid}/cwd`);
+              const leaderCwd = leaderCwdStdout.trim();
+
+              if (this.isDirectoryInside(this.projectsRoot, leaderCwd) && /vite|npm|pnpm|yarn/i.test(leaderCommand)) {
+                shouldKillGroup = true;
+              }
+            } catch (e) {
+              shouldKillGroup = false;
+            }
           }
 
-          // Wait for it to exit
+          const signal = (sig: string) => {
+            if (shouldKillGroup) {
+              try { process.kill(-pid, sig as any); } catch (e: any) {
+                if (e.code !== 'ESRCH') {
+                  try { process.kill(pid, sig as any); } catch {}
+                }
+              }
+            } else {
+              try { process.kill(pid, sig as any); } catch {}
+            }
+          };
+
+          signal('SIGTERM');
+
           let exited = false;
           for (let i = 0; i < 10; i++) {
             await new Promise(r => setTimeout(r, 500));
             try {
-              process.kill(pid, 0); // Check if process still exists
+              process.kill(pid, 0);
             } catch {
               exited = true;
               break;
@@ -216,20 +239,19 @@ class ProjectServerManager {
 
           if (!exited) {
             console.warn(`[PREVIEW] Process ${pid} did not exit with SIGTERM, sending SIGKILL.`);
-            try {
-              process.kill(-pid, 'SIGKILL');
-            } catch (e: any) {
-              try { process.kill(pid, 'SIGKILL'); } catch {}
-            }
+            signal('SIGKILL');
             await new Promise(r => setTimeout(r, 1000));
           }
           anyKilled = true;
-        } else {
-          console.log(`[PREVIEW] Skipping non-BuilderAI process: PID ${pid}, CWD: ${cwd}, CMD: ${command}`);
         }
       }
 
-      return anyKilled;
+      if (anyKilled) {
+        await new Promise(r => setTimeout(r, 1000));
+        return await this.isPortAvailable(port);
+      }
+
+      return false;
     } catch (err) {
       console.error(`[PREVIEW] Error in cleanupOrphanProcess:`, err);
       return false;
@@ -416,7 +438,7 @@ class ProjectServerManager {
           `PID: ${child.pid || 'unknown'}`,
           `Dev Server Stdout: ${info.stdout.slice(-500)}`,
           `Dev Server Stderr: ${info.stderr.slice(-500)}`,
-        ].join('\n');
+        ].join('\\n');
         throw new Error(diagnostics);
       }
 
