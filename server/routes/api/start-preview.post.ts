@@ -18,21 +18,28 @@ export default defineHandler(async (event) => {
   try {
     const info = await projectServerManager.start(projectId);
     
+    if (info.status === 'error') {
+      return {
+        success: true,
+        projectId,
+        port: info.port,
+        url: info.internalUrl,
+        status: info.status,
+      };
+    }
+
     // Wait for the server to be actually ready before responding
     const isReady = await projectServerManager.waitForReady(projectId);
     
-    if (!isReady && info.status !== 'error') {
+    if (!isReady) {
       throw new Error('Vite server started but failed to become ready within the timeout.');
     }
 
-    // If the status is error, we return the internal URL to avoid serving a public URL that doesn't work.
-    const finalUrl = info.status === 'error' ? info.internalUrl : info.publicUrl;
-    
     return {
       success: true,
       projectId,
       port: info.port,
-      url: finalUrl,
+      url: info.publicUrl,
       status: info.status,
     };
   } catch (error: any) {

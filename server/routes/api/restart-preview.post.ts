@@ -16,10 +16,20 @@ export default defineHandler(async (event) => {
   try {
     const info = await projectServerManager.restart(projectId);
     
+    if (info.status === 'error') {
+      return {
+        success: true,
+        projectId,
+        port: info.port,
+        url: info.internalUrl,
+        status: info.status,
+      };
+    }
+
     // Wait for the server to be actually ready before responding
     const isReady = await projectServerManager.waitForReady(projectId);
     
-    if (!isReady && info.status !== 'error') {
+    if (!isReady) {
       throw new Error('Vite server restarted but failed to become ready within the timeout.');
     }
 
@@ -27,7 +37,7 @@ export default defineHandler(async (event) => {
       success: true,
       projectId,
       port: info.port,
-      url: info.url,
+      url: info.publicUrl,
       status: info.status,
     };
   } catch (error: any) {
