@@ -34,7 +34,7 @@ class ProjectServerManager {
 
   private async acquireLock<T>(task: () => Promise<T>): Promise<T> {
     const currentLock = this.operationLock;
-    let release: () => void;
+    let release: (() => void) | undefined;
     const nextLock = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -44,7 +44,7 @@ class ProjectServerManager {
     try {
       return await task();
     } finally {
-      release!();
+      if (release) release();
     }
   }
 
@@ -271,8 +271,8 @@ class ProjectServerManager {
 
   private async _start(projectId: string): Promise<ProjectInfo> {
     if (this.projects.has(projectId)) {
-      const existing = this.projects.get(projectId)!;
-      if (existing.status === 'running' || existing.status === 'starting') {
+      const existing = this.projects.get(projectId);
+      if (existing && (existing.status === 'running' || existing.status === 'starting')) {
         return existing;
       }
     }
