@@ -43,10 +43,18 @@ export class SSHPreviewService {
       await this.execute(conn, `fuser -k 5173/tcp || true`);
       
       // Start the server in the background
-      const startCommand = `cd ${remoteDir} && nohup npm run dev -- --host 0.0.0.0 --port 5173 > /tmp/preview_${projectId}.log 2>&1 &`;
+      const logFile = `/tmp/preview_${projectId}.log`;
+      const startCommand = `cd ${remoteDir} && nohup npm run dev -- --host 0.0.0.0 --port 5173 > ${logFile} 2>&1 < /dev/null &`;
       await this.execute(conn, startCommand);
 
-      jobManager.updateJob(jobId, { status: 'completed', progress: 'Sucesso!' });
+      // Wait until Vite responds, rather than assuming it started successfully.
+      jobManager.updateJob(jobId, { progress: 'Aguardando o Vite iniciar...' });
+      onStatus('Aguardando o Vite iniciar...');
+
+      const healthCheck = `for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:5173/ >/dev/null 2>&1; then exit 0; fi; sleep 1; done; echo 'Vite não respondeu na porta 5173. Log do servidor:'; cat ${logFile}; exit 1`;
+      await this.execute(conn, healthCheck);
+
+      jobManager.updateJob(jobId, { status: 'completed', progress: 'Servidor Vite pronto!' });
       onStatus('Sucesso!');
     } catch (error: any) {
       console.error('[SSHPreviewService] Error:', error);

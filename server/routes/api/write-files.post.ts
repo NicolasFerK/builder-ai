@@ -5,18 +5,39 @@ import path from 'path';
 
 export default defineHandler(async (event) => {
   const body = await readBody(event);
-  const { files, projectId } = body;
+  const { files, projectId } = body ?? {};
 
-  console.log(`[REAL-APPLY] SERVER PROJECT ID: ${projectId}`);
-  console.log(`[REAL-APPLY] SERVER PROJECT ROOT: ${path.join(process.cwd(), 'projects', projectId)}`);
-  console.log(`[REAL-APPLY] SERVER FILE PATHS: ${JSON.stringify(files.map((f: any) => f.path))}`);
-
-  if (!projectId) {
+  if (typeof projectId !== "string" || !projectId.trim()) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'projectId is required',
+      statusMessage: "projectId is required",
     });
   }
+
+  if (!Array.isArray(files)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "files must be an array",
+    });
+  }
+
+  for (const file of files) {
+    if (
+      !file ||
+      typeof file.path !== "string" ||
+      !file.path.trim() ||
+      typeof file.content !== "string"
+    ) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Each file must contain a path and string content",
+      });
+    }
+  }
+
+  console.log(`[REAL-APPLY] SERVER PROJECT ID: ${projectId}`);
+  console.log(`[REAL-APPLY] SERVER PROJECT ROOT: ${path.join(process.cwd(), "projects", projectId)}`);
+  console.log(`[REAL-APPLY] SERVER FILE PATHS: ${JSON.stringify(files.map((f: any) => f.path))}`);
 
   const projectsRoot = path.join(process.cwd(), 'projects');
   const projectDir = path.join(projectsRoot, projectId);

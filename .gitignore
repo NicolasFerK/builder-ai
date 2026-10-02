@@ -29,3 +29,15 @@ dist-ssr
 /playwright/.cache/
 .last-run.json
 .dyad/
+
+# BuilderAI: arquivos locais e dados gerados
+.ssh/
+.output/
+projects/
+backups/
+
+# Backups locais de arquivos
+*.bak
+*.bak.*
+*.post.ts.bak*
+*.bak*

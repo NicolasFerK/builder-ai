@@ -1,7 +1,8 @@
-import { defineHandler, createError } from "nitro";
-import { configService } from "../services/ConfigService";
-import { SSHPreviewService } from "../services/SSHPreviewService";
-import { jobManager } from "../services/JobManager";
+import { defineHandler } from "nitro";
+import { createError } from "nitro/h3";
+import { configService } from "../../services/ConfigService";
+import { SSHPreviewService } from "../../services/SSHPreviewService";
+import { jobManager } from "../../services/JobManager";
 import path from "path";
 
 export default defineHandler(async (event) => {

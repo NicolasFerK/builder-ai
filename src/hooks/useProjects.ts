@@ -44,28 +44,58 @@ export function useProjects() {
   };
 
   const updateProject = async (projectId: string, updates: Partial<Project>) => {
-    console.log(`[REAL-APPLY] UPDATE PROJECT FILES: ${JSON.stringify(updates.files?.map(f => f.name))}`);
     const updatedProjects = projects.map((p) =>
       p.id === projectId ? { ...p, ...updates, lastModified: Date.now() } : p
     );
-    
-    // Save to localStorage for persistence in the UI
+
+    // Save to localStorage for persistence in the UI.
     saveProjects(updatedProjects);
 
-    // If we are updating files, also sync them to the filesystem
+    // Sync the file tree to the server as flat paths.
     if (updates.files) {
-      try {
-        const project = updatedProjects.find(p => p.id === projectId);
-        if (project && project.files) {
-          console.log(`[REAL-APPLY] WRITE FILES PAYLOAD: ${JSON.stringify({ files: project.files, projectId: projectId })}`);
-          await fetch('/api/write-files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: project.files, projectId: projectId }),
-          });
+      const project = updatedProjects.find((p) => p.id === projectId);
+
+      if (project) {
+        const filesToWrite: { path: string; content: string }[] = [];
+
+        const flattenFiles = (nodes: typeof project.files, parentPath = "") => {
+          for (const node of nodes) {
+            const currentPath = parentPath
+              ? `${parentPath}/${node.name}`
+              : node.name;
+
+            if (node.type === "folder") {
+              flattenFiles(node.children || [], currentPath);
+            } else {
+              filesToWrite.push({
+                path: currentPath,
+                content: node.content ?? "",
+              });
+            }
+          }
+        };
+
+        flattenFiles(project.files);
+
+        console.log(
+          "[REAL-APPLY] FLATTENED FILES:",
+          JSON.stringify(filesToWrite.map((f) => f.path))
+        );
+
+        const response = await fetch("/api/write-files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: filesToWrite, projectId }),
+        });
+
+        if (!response.ok) {
+          const details = await response.text();
+          throw new Error(
+            `Failed to save files (${response.status}): ${details}`
+          );
         }
-      } catch (error) {
-        console.error('Failed to sync files to filesystem:', error);
+
+        console.log(`[REAL-APPLY] SERVER SYNC SUCCESS: ${filesToWrite.length} files`);
       }
     }
   };

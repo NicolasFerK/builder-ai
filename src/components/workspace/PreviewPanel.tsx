@@ -1,124 +1,177 @@
-import React, { useMemo } from 'react';
-import { Monitor, Smartphone } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  Monitor,
+  Smartphone,
+  RefreshCw,
+  ExternalLink,
+  Loader2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSettings } from '@/context/SettingsContext';
-import { FileNode } from '@/types';
-import { SandpackProvider, SandpackPreview } from "@codesandbox/sandpack-react";
 
 interface PreviewPanelProps {
   projectId: string;
-  files: FileNode[];
+  files: any[];
 }
 
-/**
- * Flattens a FileNode tree into a flat object of file paths and contents.
- */
-function flattenFiles(nodes: FileNode[], base: string = ""): Record<string, string> {
-  let flat: Record<string, string> = {};
-  for (const node of nodes) {
-    const path = base + (base ? "/" : "") + node.name;
-    if (node.type === 'file') {
-      if (node.content !== undefined) {
-        flat[path] = node.content;
-      }
-    } else if (node.type === 'folder' && node.children) {
-      Object.assign(flat, flattenFiles(node.children, path));
-    }
-  }
-  return flat;
-}
-
-export function PreviewPanel({ projectId, files }: PreviewPanelProps) {
+export function PreviewPanel({ projectId }: PreviewPanelProps) {
   const { settings, updateSettings } = useSettings();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Prepare Sandpack files: flatten the tree and remove the package.json from the files object
-  // as its dependencies will be handled in customSetup.
-  const sandpackFiles = useMemo(() => {
-    const flat = flattenFiles(files);
-    delete flat['package.json'];
-    return flat;
-  }, [files]);
+  useEffect(() => {
+    let cancelled = false;
 
-  // Prepare Sandpack customSetup: extract dependencies from package.json in the files list
-  const sandpackCustomSetup = useMemo(() => {
-    // We search for the package.json node in the original files array
-    // Since the files might be a tree, we need a helper to find it or just flatten and look.
-    // Let's use a simpler approach: flatten everything and look for package.json.
-    const allFiles = flattenFiles(files);
-    const pkgContent = allFiles['package.json'];
+    async function startPreview() {
+      setLoading(true);
+      setError(null);
+      setPreviewUrl(null);
 
-    if (pkgContent) {
       try {
-        const pkg = JSON.parse(pkgContent);
-        const dependencies = {
-          ...(pkg.dependencies || {}),
-          ...(pkg.devDependencies || {}),
-        };
-
-        // Remove vite, @vitejs/plugin-react, and any @types packages from the dependency list
-        Object.keys(dependencies).forEach((dep) => {
-          if (
-            dep.includes('vite') || 
-            dep.includes('@vitejs/plugin-react') || 
-            dep.includes('@types/')
-          ) {
-            delete dependencies[dep];
-          }
+        const response = await fetch('/api/start-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId }),
         });
 
-        return {
-          dependencies,
-        };
-      } catch (error) {
-        console.error('[PREVIEW] Failed to parse package.json for Sandpack setup:', error);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data.statusMessage ||
+            data.message ||
+            'Não foi possível iniciar o preview.'
+          );
+        }
+
+        if (data.status === 'error' || !data.url) {
+          throw new Error(
+            data.statusMessage ||
+            'O servidor do projeto não iniciou corretamente.'
+          );
+        }
+
+        if (!cancelled) {
+          setPreviewUrl(data.url);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || 'Erro ao iniciar o preview.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
-    return {};
-  }, [files]);
+
+    startPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, refreshKey]);
 
   return (
-    <div className='flex flex-col h-full bg-muted/30'>
-      <div className='p-2 border-b flex items-center justify-between bg-background'>
-        <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-muted-foreground px-2'>Preview</span>
-        </div>
-        <div className='flex items-center gap-1 bg-muted p-1 rounded-lg'>
-          <Button 
-            variant={settings.viewMode === 'desktop' ? 'secondary' : 'ghost'} 
-            size='icon' 
-            className='h-7 w-7'
-            onClick={() => updateSettings({ viewMode: 'desktop' })}
+    <div className="flex flex-col h-full bg-muted/30">
+      <div className="p-2 border-b flex items-center justify-between bg-background">
+        <span className="text-xs font-medium text-muted-foreground px-2">
+          Preview
+        </span>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Reiniciar preview"
+            onClick={() => setRefreshKey((key) => key + 1)}
+            disabled={loading}
           >
-            <Monitor className='w-4 h-4' />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button 
-            variant={settings.viewMode === 'mobile' ? 'secondary' : 'ghost'} 
-            size='icon' 
-            className='h-7 w-7'
-            onClick={() => updateSettings({ viewMode: 'mobile' })}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Abrir em nova aba"
+            onClick={() => {
+              if (previewUrl) {
+                window.open(previewUrl, '_blank', 'noopener,noreferrer');
+              }
+            }}
+            disabled={!previewUrl || loading}
           >
-            <Smartphone className='w-4 h-4' />
+            <ExternalLink className="w-4 h-4" />
           </Button>
+
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            <Button
+              variant={settings.viewMode === 'desktop' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-7 w-7"
+              title="Desktop"
+              onClick={() => updateSettings({ viewMode: 'desktop' })}
+            >
+              <Monitor className="w-4 h-4" />
+            </Button>
+
+            <Button
+              variant={settings.viewMode === 'mobile' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-7 w-7"
+              title="Mobile"
+              onClick={() => updateSettings({ viewMode: 'mobile' })}
+            >
+              <Smartphone className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
-      
-      <div className='flex-1 flex items-center justify-center p-4 bg-slate-100 overflow-hidden relative'>
-        <div className={`shadow-2xl rounded-lg overflow-hidden bg-white transition-all duration-300 ${
-          settings.viewMode === 'mobile' 
-            ? 'w-[375px] h-[667px]' 
-            : 'w-full h-full max-w-5xl'
-        }`}>
-          <SandpackProvider
-            template="vite-react"
-            files={sandpackFiles}
-            customSetup={sandpackCustomSetup}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <SandpackPreview 
-              showOpenInCodeSandbox={false} 
-              showRefreshButton 
+
+      <div className="flex-1 flex items-center justify-center p-4 bg-slate-100 overflow-hidden">
+        <div
+          className={`shadow-2xl rounded-lg overflow-hidden bg-white transition-all duration-300 ${
+            settings.viewMode === 'mobile'
+              ? 'w-[375px] h-[667px] max-w-full max-h-full'
+              : 'w-full h-full max-w-5xl'
+          }`}
+        >
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Iniciando preview do projeto...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <p className="text-sm text-destructive">
+                Falha ao iniciar o preview
+              </p>
+              <p className="text-xs text-muted-foreground break-words">
+                {error}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRefreshKey((key) => key + 1)}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : previewUrl ? (
+            <iframe
+              key={`${projectId}-${refreshKey}`}
+              title={`Preview do projeto ${projectId}`}
+              src={previewUrl}
+              className="w-full h-full border-0 bg-white"
+              allow="clipboard-read; clipboard-write"
             />
-          </SandpackProvider>
+          ) : null}
         </div>
       </div>
     </div>
