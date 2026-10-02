@@ -154,8 +154,15 @@ class ProjectServerManager {
   }
 
   private isDirectoryInside(parent: string, child: string): boolean {
-    const relative = path.relative(parent, child);
-    return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+    try {
+      const absParent = path.resolve(parent);
+      const absChild = path.resolve(child);
+      const relative = path.relative(absParent, absChild);
+      if (!relative || path.isAbsolute(relative)) return false;
+      return !(relative.startsWith('..' + path.sep) || relative === '..');
+    } catch {
+      return false;
+    }
   }
 
   private async cleanupOrphanProcess(port: number): Promise<boolean> {
@@ -214,7 +221,7 @@ class ProjectServerManager {
 
           const signal = (sig: string) => {
             if (shouldKillGroup) {
-              try { process.kill(-pid, sig as any); } catch (e: any) {
+              try { process.kill(-pgid, sig as any); } catch (e: any) {
                 if (e.code !== 'ESRCH') {
                   try { process.kill(pid, sig as any); } catch {}
                 }
@@ -438,7 +445,7 @@ class ProjectServerManager {
           `PID: ${child.pid || 'unknown'}`,
           `Dev Server Stdout: ${info.stdout.slice(-500)}`,
           `Dev Server Stderr: ${info.stderr.slice(-500)}`,
-        ].join('\\n');
+        ].join('\n');
         throw new Error(diagnostics);
       }
 
