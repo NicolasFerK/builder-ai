@@ -63,7 +63,7 @@ class ProjectServerManager {
 
   async getPackageManager(projectPath: string): Promise<{ manager: string; conflict: string | null }> {
     let preferredManager: string | null = null;
-    let detectedManagers: string[] = [];
+    const detectedManagers: string[] = [];
     let conflict: string | null = null;
 
     try {
