@@ -1,7 +1,10 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, exec } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import net from 'net';
+import { promisify } from 'util';
+
+const execPromise = promisify(exec);
 
 export interface ProjectInfo {
   process: ChildProcess | null;
@@ -26,6 +29,24 @@ class ProjectServerManager {
   private projects: Map<string, ProjectInfo> = new Map();
   private readonly projectsRoot = path.join(process.cwd(), 'projects');
   private readonly PREVIEW_PORT = 5173;
+  
+  private operationLock: Promise<void> = Promise.resolve();
+
+  private async acquireLock<T>(task: () => Promise<T>): Promise<T> {
+    const currentLock = this.operationLock;
+    let release: () => void;
+    const nextLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.operationLock = nextLock;
+
+    await currentLock;
+    try {
+      return await task();
+    } finally {
+      release!();
+    }
+  }
 
   async getPackageManager(projectPath: string): Promise<{ manager: string; conflict: string | null }> {
     let preferredManager: string | null = null;
@@ -132,8 +153,68 @@ class ProjectServerManager {
     return `${base}/`;
   }
 
+  private async cleanupOrphanProcess(port: number): Promise<boolean> {
+    try {
+      let pid: number;
+      try {
+        const { stdout } = await execPromise(`lsof -t -i:${port}`);
+        pid = parseInt(stdout.trim().split('\n')[0], 10);
+      } catch (e) {
+        return false;
+      }
+
+      if (isNaN(pid)) return false;
+
+      const { stdout: cmdStr } = await execPromise(`ps -p ${pid} -o args=`);
+      const command = cmdStr.trim();
+      console.log(`[PREVIEW] Detected process on port ${port}: PID ${pid}, Command: ${command}`);
+
+      const isViteRelated = /vite|npm|pnpm|yarn/i.test(command);
+      const isInsideProjects = command.includes('/projects/') || command.includes('\\projects\\') || command.includes('projects/');
+
+      if (isViteRelated && isInsideProjects) {
+        console.log(`[PREVIEW] Process ${pid} matches BuilderAI preview pattern. Attempting termination.`);
+        
+        try {
+          process.kill(-pid, 'SIGTERM');
+        } catch (e: any) {
+          try { process.kill(pid, 'SIGTERM'); } catch {}
+        }
+
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          try {
+            process.kill(pid, 0);
+          } catch {
+            console.log(`[PREVIEW] Orphan process ${pid} terminated.`);
+            return true;
+          }
+        }
+
+        console.warn(`[PREVIEW] Process ${pid} still alive after SIGTERM, using SIGKILL.`);
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch (e: any) {
+          try { process.kill(pid, 'SIGKILL'); } catch {}
+        }
+        
+        await new Promise(r => setTimeout(r, 1000));
+        return true;
+      } else {
+        console.log(`[PREVIEW] Process ${pid} on port ${port} does not match BuilderAI preview pattern. Skipping.`);
+        return false;
+      }
+    } catch (err) {
+      console.error(`[PREVIEW] Error in cleanupOrphanProcess:`, err);
+      return false;
+    }
+  }
+
   async start(projectId: string): Promise<ProjectInfo> {
-    // 1. Check if project is already being managed
+    return this.acquireLock(() => this._start(projectId));
+  }
+
+  private async _start(projectId: string): Promise<ProjectInfo> {
     if (this.projects.has(projectId)) {
       const existing = this.projects.get(projectId)!;
       if (existing.status === 'running' || existing.status === 'starting') {
@@ -141,17 +222,13 @@ class ProjectServerManager {
       }
     }
 
-    // Apenas um preview público fica ativo na porta 5173.
-    // Ao trocar de projeto, encerra o servidor anterior primeiro.
     for (const [otherProjectId, otherInfo] of this.projects.entries()) {
       if (
         otherProjectId !== projectId &&
         (otherInfo.status === 'running' || otherInfo.status === 'starting')
       ) {
-        console.log(
-          `[PREVIEW] Switching from ${otherProjectId} to ${projectId}`
-        );
-        await this.stop(otherProjectId);
+        console.log(`[PREVIEW] Switching from ${otherProjectId} to ${projectId}`);
+        await this._stop(otherProjectId);
       }
     }
 
@@ -160,7 +237,6 @@ class ProjectServerManager {
     const internalUrl = `http://127.0.0.1:${port}`;
     const publicUrl = await this.getPublicUrl(port);
 
-    // 2. Create the project info entry IMMEDIATELY to prevent race conditions
     const info: ProjectInfo = {
       process: null,
       port,
@@ -182,36 +258,37 @@ class ProjectServerManager {
     this.projects.set(projectId, info);
 
     try {
-      // 3. Ensure directory exists
       try {
         await fs.mkdir(projectPath, { recursive: true });
       } catch (e) {
         console.error(`[PREVIEW] Failed to create directory ${projectPath}`, e);
       }
 
-      // 4. Check for port conflicts (other projects or other processes)
       const isPortManaged = Array.from(this.projects.values()).some(
         p => p.port === port && (p.status === 'running' || p.status === 'starting') && p.projectPath !== projectPath
       );
 
       if (isPortManaged) {
-        const errorMsg = `Port ${port} is already in use by another preview project.`;
-        throw new Error(errorMsg);
+        throw new Error(`Port ${port} is already in use by another preview project.`);
       }
 
-      const isPortFree = await this.isPortAvailable(port);
+      let isPortFree = await this.isPortAvailable(port);
       if (!isPortFree) {
-        const errorMsg = `Port ${port} is already occupied by another process on this machine.`;
-        throw new Error(errorMsg);
+        console.log(`[PREVIEW] Port ${port} is occupied. Checking for orphans...`);
+        const cleanedUp = await this.cleanupOrphanProcess(port);
+        if (cleanedUp) {
+          isPortFree = await this.isPortAvailable(port);
+        }
+      }
+
+      if (!isPortFree) {
+        throw new Error(`Port ${port} is already occupied by another process on this machine.`);
       }
 
       console.log('[PREVIEW] starting project', { projectId, projectPath, port, publicUrl });
 
-      // 5. Package Manager & Dependencies
       const { manager: pkgManager, conflict } = await this.getPackageManager(projectPath);
-      if (conflict) {
-        console.warn(`[PREVIEW] ${conflict}`);
-      }
+      if (conflict) console.warn(`[PREVIEW] ${conflict}`);
 
       const nodeModulesPath = path.join(projectPath, 'node_modules');
       let needsInstall = false;
@@ -219,7 +296,6 @@ class ProjectServerManager {
       try {
         await fs.access(nodeModulesPath);
       } catch {
-        console.log(`[PREVIEW] node_modules not found, installing dependencies with ${pkgManager}...`);
         needsInstall = true;
       }
 
@@ -233,9 +309,8 @@ class ProjectServerManager {
 
         const lockfiles = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'];
         for (const lockfile of lockfiles) {
-          const lockfilePath = path.join(projectPath, lockfile);
           try {
-            await fs.rm(lockfilePath, { force: true });
+            await fs.rm(path.join(projectPath, lockfile), { force: true });
           } catch (err) {}
         }
 
@@ -249,7 +324,6 @@ class ProjectServerManager {
         }
       }
 
-      // 6. Start Dev Server
       console.log(`[PREVIEW] starting dev server with ${pkgManager} on port: ${port}`);
 
       let command = '';
@@ -265,8 +339,6 @@ class ProjectServerManager {
 
       info.command = command;
       info.cwd = projectPath;
-
-      console.log(`[PREVIEW] Executing command: "${command}" in ${projectPath}`);
 
       const child = spawn(command, [], {
         cwd: projectPath,
@@ -307,28 +379,18 @@ class ProjectServerManager {
         info.process = null;
       });
 
-      // 7. Wait for the port to actually be responsive
       const isReady = await this.waitForReady(projectId, 15000);
       if (!isReady) {
-        console.error(`[PREVIEW] Vite failed to become responsive on port ${port} within 15 seconds.`);
-        
-          // Encerra o grupo inteiro, incluindo npm/pnpm e Vite.
-          await this.terminateProcessGroup(child);
-
+        await this.terminateProcessGroup(child);
         const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
         const diagnostics = [
           `Error: ${errorMsg}`,
           `Command: ${command}`,
           `CWD: ${projectPath}`,
           `PID: ${child.pid || 'unknown'}`,
-          `Exit Code: ${child.exitCode}`,
-          `Exit Signal: ${child.signal}`,
-          `Installation Status: ${info.npmInstallExitCode === 0 ? 'Success' : 'Failed/Not run'}`,
-          `Installation Error: ${info.npmInstallError || 'None'}`,
-          `Dev Server Stdout: ${info.stdout.slice(-500)}`, // last 500 chars
-          `Dev Server Stderr: ${info.stderr.slice(-500)}`, // last 500 chars
-        ].join('\n');
-        
+          `Dev Server Stdout: ${info.stdout.slice(-500)}`,
+          `Dev Server Stderr: ${info.stderr.slice(-500)}`,
+        ].join('\\n');
         throw new Error(diagnostics);
       }
 
@@ -338,17 +400,12 @@ class ProjectServerManager {
       console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
       info.status = 'error';
       info.error = error.message;
-      
-        // Encerra também os processos descendentes se a inicialização falhar.
-        if (info.process) {
-          const failedProcess = info.process;
-          await this.terminateProcessGroup(failedProcess);
-          if (info.process === failedProcess) {
-            info.process = null;
-          }
-        }
-      
-      return info;
+      if (info.process) {
+        const failedProcess = info.process;
+        await this.terminateProcessGroup(failedProcess);
+        if (info.process === failedProcess) info.process = null;
+      }
+      throw error;
     }
   }
 
@@ -361,19 +418,11 @@ class ProjectServerManager {
   private async runCommandWithOutput(command: string, args: string[], cwd: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const cmd = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-      const child = spawn(cmd, [], {
-        cwd,
-        shell: true,
-        stdio: 'pipe',
-      });
+      const child = spawn(cmd, [], { cwd, shell: true, stdio: 'pipe' });
       let stdout = '';
       let stderr = '';
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
-      child.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
+      child.stdout?.on('data', (data) => { stdout += data.toString(); });
+      child.stderr?.on('data', (data) => { stderr += data.toString(); });
       child.on('close', (code) => {
         if (code === 0) resolve();
         else {
@@ -390,16 +439,13 @@ class ProjectServerManager {
 
   private async terminateProcessGroup(child: ChildProcess): Promise<void> {
     const pid = child.pid;
-
     if (!pid) {
       try { child.kill('SIGTERM'); } catch {}
       return;
     }
 
     const signalGroup = (signal: NodeJS.Signals) => {
-      try {
-        process.kill(-pid, signal);
-      } catch (error: any) {
+      try { process.kill(-pid, signal); } catch (error: any) {
         if (error.code !== 'ESRCH') {
           try { child.kill(signal); } catch {}
         }
@@ -407,12 +453,7 @@ class ProjectServerManager {
     };
 
     const groupExists = (): boolean => {
-      try {
-        process.kill(-pid, 0);
-        return true;
-      } catch (error: any) {
-        return error.code === 'EPERM';
-      }
+      try { process.kill(-pid, 0); return true; } catch (error: any) { return error.code === 'EPERM'; }
     };
 
     const waitForGroupExit = async (timeoutMs: number): Promise<boolean> => {
@@ -433,21 +474,22 @@ class ProjectServerManager {
   }
 
   async stop(projectId: string) {
+    return this.acquireLock(() => this._stop(projectId));
+  }
+
+  private async _stop(projectId: string) {
     const info = this.projects.get(projectId);
     if (!info) return;
-
-    const child = info.process;
-    if (child) {
-      await this.terminateProcessGroup(child);
-    }
-
+    if (info.process) await this.terminateProcessGroup(info.process);
     info.process = null;
     info.status = 'stopped';
   }
 
   async restart(projectId: string) {
-    await this.stop(projectId);
-    return this.start(projectId);
+    return this.acquireLock(async () => {
+      await this._stop(projectId);
+      return await this._start(projectId);
+    });
   }
 
   getStatus(projectId: string): ProjectInfo | undefined {
