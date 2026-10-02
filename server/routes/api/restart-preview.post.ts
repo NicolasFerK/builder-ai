@@ -42,12 +42,12 @@ export default defineHandler(async (event) => {
       url: info.publicUrl,
       status: info.status,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to restart preview:', error);
     const info = projectServerManager.getStatus(projectId);
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'Failed to restart preview',
+      statusMessage: error instanceof Error ? error.message : 'Failed to restart preview',
       data: {
         diagnostics: info ? {
           stdout: info.stdout,

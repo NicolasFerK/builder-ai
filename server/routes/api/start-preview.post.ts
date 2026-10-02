@@ -44,12 +44,12 @@ export default defineHandler(async (event) => {
       url: info.publicUrl,
       status: info.status,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to start preview:', error);
     const info = projectServerManager.getStatus(projectId);
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'Failed to start preview',
+      statusMessage: error instanceof Error ? error.message : 'Failed to start preview',
       data: {
         diagnostics: info ? {
           stdout: info.stdout,

@@ -25,6 +25,19 @@ export interface ProjectInfo {
   error: string | null;
 }
 
+class CommandError extends Error {
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+  constructor(message: string, exitCode: number, stderr: string, stdout: string) {
+    super(message);
+    this.name = 'CommandError';
+    this.exitCode = exitCode;
+    this.stderr = stderr;
+    this.stdout = stdout;
+  }
+}
+
 class ProjectServerManager {
   private projects: Map<string, ProjectInfo> = new Map();
   private readonly projectsRoot = path.join(process.cwd(), 'projects');
@@ -63,7 +76,7 @@ class ProjectServerManager {
           preferredManager = match[1];
         }
       }
-    } catch (e) {
+    } catch {
       // package.json might not exist or be invalid
     }
 
@@ -88,7 +101,7 @@ class ProjectServerManager {
           // not pnpm
         }
       }
-    } catch (e) {
+    } catch {
       // error reading dir
     }
 
@@ -191,7 +204,7 @@ class ProjectServerManager {
 
           const { stdout: cwdStdout } = await execPromise(`readlink -f /proc/${pid}/cwd`);
           cwd = cwdStdout.trim();
-        } catch (e) {
+        } catch {
           continue;
         }
 
@@ -214,20 +227,22 @@ class ProjectServerManager {
               if (this.isDirectoryInside(this.projectsRoot, leaderCwd) && /vite|npm|pnpm|yarn/i.test(leaderCommand)) {
                 shouldKillGroup = true;
               }
-            } catch (e) {
+            } catch {
               shouldKillGroup = false;
             }
           }
 
           const signal = (sig: string) => {
             if (shouldKillGroup) {
-              try { process.kill(-pgid, sig as any); } catch (e: any) {
-                if (e.code !== 'ESRCH') {
-                  try { process.kill(pid, sig as any); } catch {}
+              try {
+                process.kill(-pgid, sig);
+              } catch (e: unknown) {
+                if (e instanceof Error && e.code !== 'ESRCH') {
+                  try { process.kill(pid, sig); } catch { /* ignore */ }
                 }
               }
             } else {
-              try { process.kill(pid, sig as any); } catch {}
+              try { process.kill(pid, sig); } catch { /* ignore */ }
             }
           };
 
@@ -259,7 +274,7 @@ class ProjectServerManager {
       }
 
       return false;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[PREVIEW] Error in cleanupOrphanProcess:`, err);
       return false;
     }
@@ -315,7 +330,7 @@ class ProjectServerManager {
     try {
       try {
         await fs.mkdir(projectPath, { recursive: true });
-      } catch (e) {
+      } catch (e: unknown) {
         console.error(`[PREVIEW] Failed to create directory ${projectPath}`, e);
       }
 
@@ -358,7 +373,7 @@ class ProjectServerManager {
         console.log(`[PREVIEW] Preparing fresh installation with ${pkgManager} in ${projectPath}...`);
         try {
           await fs.rm(nodeModulesPath, { recursive: true, force: true });
-        } catch (err) {
+        } catch (err: unknown) {
           console.error(`[PREVIEW] Failed to remove existing node_modules:`, err);
         }
 
@@ -366,15 +381,20 @@ class ProjectServerManager {
         for (const lockfile of lockfiles) {
           try {
             await fs.rm(path.join(projectPath, lockfile), { force: true });
-          } catch (err) {}
+          } catch { /* ignore */ }
         }
 
         try {
           await this.runCommandWithOutput(pkgManager, ['install'], projectPath);
           info.npmInstallExitCode = 0;
-        } catch (err: any) {
-          info.npmInstallError = err.message;
-          info.npmInstallExitCode = err.exitCode ?? -1;
+        } catch (err: unknown) {
+          if (err instanceof CommandError) {
+            info.npmInstallError = err.message;
+            info.npmInstallExitCode = err.exitCode;
+          } else {
+            info.npmInstallError = err instanceof Error ? err.message : String(err);
+            info.npmInstallExitCode = -1;
+          }
           throw err;
         }
       }
@@ -451,10 +471,10 @@ class ProjectServerManager {
 
       return info;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[PREVIEW] [${projectId}] failed to start:`, error);
       info.status = 'error';
-      info.error = error.message;
+      info.error = error instanceof Error ? error.message : String(error);
       if (info.process) {
         const failedProcess = info.process;
         await this.terminateProcessGroup(failedProcess);
@@ -481,10 +501,7 @@ class ProjectServerManager {
       child.on('close', (code) => {
         if (code === 0) resolve();
         else {
-          const err = new Error(stderr || `Command ${command} exited with code ${code}`);
-          (err as any).exitCode = code;
-          (err as any).stderr = stderr;
-          (err as any).stdout = stdout;
+          const err = new CommandError(stderr || `Command ${command} exited with code ${code}`, code ?? -1, stderr, stdout);
           reject(err);
         }
       });
@@ -495,20 +512,27 @@ class ProjectServerManager {
   private async terminateProcessGroup(child: ChildProcess): Promise<void> {
     const pid = child.pid;
     if (!pid) {
-      try { child.kill('SIGTERM'); } catch {}
+      try { child.kill('SIGTERM'); } catch { /* ignore */ }
       return;
     }
 
     const signalGroup = (signal: NodeJS.Signals) => {
-      try { process.kill(-pid, signal); } catch (error: any) {
-        if (error.code !== 'ESRCH') {
-          try { child.kill(signal); } catch {}
+      try {
+        process.kill(-pid, signal);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.code !== 'ESRCH') {
+          try { child.kill(signal); } catch { /* ignore */ }
         }
       }
     };
 
     const groupExists = (): boolean => {
-      try { process.kill(-pid, 0); return true; } catch (error: any) { return error.code === 'EPERM'; };
+      try {
+        process.kill(-pid, 0);
+        return true;
+      } catch (error: unknown) {
+        return error instanceof Error && error.code === 'EPERM';
+      }
     };
 
     const waitForGroupExit = async (timeoutMs: number): Promise<boolean> => {
