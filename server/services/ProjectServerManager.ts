@@ -183,11 +183,11 @@ class ProjectServerManager {
       const { stdout: ssStdout } = await execPromise(`ss -lptn 'sport = :${port}'`);
       if (!ssStdout.trim()) return false;
 
-      const lines = ssStdout.trim().split('\n');
+      const lines = ssStdout.trim().split('\\n');
       let anyKilled = false;
 
       for (const line of lines) {
-        const pidMatch = line.match(/pid=(\d+)/);
+        const pidMatch = line.match(/pid=(\\d+)/);
         if (!pidMatch) continue;
         const pid = parseInt(pidMatch[1], 10);
 
@@ -197,7 +197,7 @@ class ProjectServerManager {
 
         try {
           const { stdout: psStdout } = await execPromise(`ps -p ${pid} -o pgid=,args=`);
-          const parts = psStdout.trim().split(/\s+/);
+          const parts = psStdout.trim().split(/\\s+/);
           if (parts.length < 2) continue;
           pgid = parseInt(parts[0], 10);
           command = parts.slice(1).join(' ');
@@ -209,7 +209,7 @@ class ProjectServerManager {
         }
 
         const isInsideProjects = this.isDirectoryInside(this.projectsRoot, cwd);
-        const isDevServer = /vite|npm|pnpm|yarn/i.test(command);
+        const isDevServer = /vite|npm|pnpm|yarn|serve/i.test(command);
 
         if (isInsideProjects && isDevServer) {
           console.log(`[PREVIEW] Detected BuilderAI orphan process: PID ${pid}, PGID ${pgid}, CWD: ${cwd}, CMD: ${command}`);
@@ -224,7 +224,7 @@ class ProjectServerManager {
               const { stdout: leaderCwdStdout } = await execPromise(`readlink -f /proc/${pgid}/cwd`);
               const leaderCwd = leaderCwdStdout.trim();
 
-              if (this.isDirectoryInside(this.projectsRoot, leaderCwd) && /vite|npm|pnpm|yarn/i.test(leaderCommand)) {
+              if (this.isDirectoryInside(this.projectsRoot, leaderCwd) && /vite|npm|pnpm|yarn|serve/i.test(leaderCommand)) {
                 shouldKillGroup = true;
               }
             } catch {
@@ -399,18 +399,22 @@ class ProjectServerManager {
         }
       }
 
-      console.log(`[PREVIEW] starting dev server with ${pkgManager} on port: ${port}`);
-
-      let command = '';
-      if (pkgManager === 'npm') {
-        command = `npm run dev -- --port ${port} --host 0.0.0.0 --strictPort`;
-      } else if (pkgManager === 'pnpm') {
-        command = `pnpm run dev --port ${port} --host 0.0.0.0 --strictPort`;
-      } else if (pkgManager === 'yarn') {
-        command = `yarn dev --port ${port} --host 0.0.0.0 --strictPort`;
-      } else {
-        command = `${pkgManager} run dev --port ${port} --host 0.0.0.0 --strictPort`;
+      console.log(`[PREVIEW] building project in ${projectPath}...`);
+      try {
+        await this.runCommandWithOutput(pkgManager, ['run', 'build'], projectPath);
+      } catch (err: unknown) {
+        if (err instanceof CommandError) {
+          info.npmRunDevError = `Build failed: ${err.message}`;
+        } else {
+          info.npmRunDevError = `Build failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        throw err;
       }
+
+      console.log(`[PREVIEW] starting static server on port: ${port}`);
+
+      const builderAiServePath = path.resolve(process.cwd(), 'node_modules', '.bin', 'serve');
+      const command = `${builderAiServePath} dist -l 0.0.0.0:${port} -s`;
 
       info.command = command;
       info.cwd = projectPath;
@@ -427,7 +431,7 @@ class ProjectServerManager {
       child.stdout?.on('data', (data) => {
         const output = data.toString();
         info.stdout += output;
-        if (output.includes('ready in') || output.includes('VITE v')) {
+        if (output.includes('ready in') || output.includes('VITE v') || output.includes('Accepting connections')) {
            info.status = 'running';
         }
       });
@@ -457,15 +461,15 @@ class ProjectServerManager {
       const isReady = await this.waitForReady(projectId, 15000);
       if (!isReady) {
         await this.terminateProcessGroup(child);
-        const errorMsg = `Vite failed to become responsive on port ${port} within 15 seconds.`;
+        const errorMsg = `Preview server failed to become responsive on port ${port} within 15 seconds.`;
         const diagnostics = [
           `Error: ${errorMsg}`,
           `Command: ${command}`,
           `CWD: ${projectPath}`,
           `PID: ${child.pid || 'unknown'}`,
-          `Dev Server Stdout: ${info.stdout.slice(-500)}`,
-          `Dev Server Stderr: ${info.stderr.slice(-500)}`,
-        ].join('\n');
+          `Server Stdout: ${info.stdout.slice(-500)}`,
+          `Server Stderr: ${info.stderr.slice(-500)}`,
+        ].join('\\n');
         throw new Error(diagnostics);
       }
 

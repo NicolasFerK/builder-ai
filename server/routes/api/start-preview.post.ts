@@ -34,7 +34,7 @@ export default defineHandler(async (event) => {
     const isReady = await projectServerManager.waitForReady(projectId);
     
     if (!isReady) {
-      throw new Error('Vite server started but failed to become ready within the timeout.');
+      throw new Error('Preview server started but failed to become ready within the timeout.');
     }
 
     return {
