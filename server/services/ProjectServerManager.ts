@@ -414,12 +414,13 @@ class ProjectServerManager {
       console.log(`[PREVIEW] starting static server on port: ${port}`);
 
       const builderAiServePath = path.resolve(process.cwd(), 'node_modules', '.bin', 'serve');
-      const command = `${builderAiServePath} dist -l 0.0.0.0:${port} -s`;
+      const args = ["-s", "dist", "-l", `tcp://0.0.0.0:${port}`];
+      const command = builderAiServePath;
 
-      info.command = command;
+      info.command = `${command} ${args.join(' ')}`;
       info.cwd = projectPath;
 
-      const child = spawn(command, [], {
+      const child = spawn(command, args, {
         cwd: projectPath,
         shell: true,
         detached: true,
