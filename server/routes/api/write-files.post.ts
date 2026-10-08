@@ -1,7 +1,6 @@
 import { defineHandler } from "nitro";
 import { readBody, createError } from "nitro/h3";
-import fs from 'fs/promises';
-import path from 'path';
+import { projectServerManager } from "../services/ProjectServerManager";
 
 export default defineHandler(async (event) => {
   const body = await readBody(event);
@@ -36,35 +35,19 @@ export default defineHandler(async (event) => {
   }
 
   console.log(`[REAL-APPLY] SERVER PROJECT ID: ${projectId}`);
-  console.log(`[REAL-APPLY] SERVER PROJECT ROOT: ${path.join(process.cwd(), "projects", projectId)}`);
   console.log(`[REAL-APPLY] SERVER FILE PATHS: ${JSON.stringify(files.map((f: any) => f.path))}`);
 
-  const projectsRoot = path.join(process.cwd(), 'projects');
-  const projectDir = path.join(projectsRoot, projectId);
-
   try {
-    for (const file of files) {
-      // Prevent path traversal
-      const sanitizedPath = path.normalize(file.path).replace(/^(\\\.\\.(\/|\\|$))+/, '');
-      const filePath = path.join(projectDir, sanitizedPath);
-      
-      // Double check that the filePath is still within projectDir
-      if (!filePath.startsWith(projectDir)) {
-        throw new Error(`Attempted path traversal: ${file.path}`);
-      }
-
-      const dirPath = path.dirname(filePath);
-      await fs.mkdir(dirPath, { recursive: true });
-      await fs.writeFile(filePath, file.content, 'utf-8');
-    }
+    // Instead of just writing files, we use applyCode which also builds and restarts the preview
+    await projectServerManager.applyCode(projectId, files);
     
-    console.log(`[REAL-APPLY] FILES WRITTEN: ${JSON.stringify(files.map((f: any) => f.path))}`);
+    console.log(`[REAL-APPLY] SERVER APPLY SUCCESS: ${projectId}`);
     return { success: true };
   } catch (error: any) {
-    console.error('Failed to write files:', error);
+    console.error('Failed to apply code:', error);
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'Failed to write files to filesystem',
+      statusMessage: error.message || 'Failed to apply code to project',
     });
   }
 });

@@ -596,7 +596,15 @@ class ProjectServerManager {
   async applyCode(projectId: string, files: { path: string; content: string }[]): Promise<void> {
     await this.runQueued(projectId, async () => {
       const projectPath = path.join(this.projectsRoot, projectId);
-      
+      const info = this.projects.get(projectId);
+      const port = info?.port;
+
+      console.log('[PREVIEW-DEBUG] Starting applyCode');
+      console.log('[PREVIEW-DEBUG] projectId:', projectId);
+      console.log('[PREVIEW-DEBUG] projectPath:', projectPath);
+      console.log('[PREVIEW-DEBUG] port:', port);
+      console.log('[PREVIEW-DEBUG] distPath:', path.join(projectPath, 'dist'));
+
       // 1. Write files
       for (const file of files) {
         const sanitizedPath = path.normalize(file.path).replace(/^(?:\.\.(?:[\\/]|$))+/, '');
@@ -611,19 +619,62 @@ class ProjectServerManager {
         await fs.writeFile(filePath, file.content, 'utf-8');
       }
 
+      // VERIFICATION A: Check if files are actually on disk
+      for (const file of files) {
+        const filePath = path.join(projectPath, path.normalize(file.path).replace(/^(?:\.\.(?:[\\/]|$))+/, ''));
+        const content = await fs.readFile(filePath, 'utf-8');
+        if (content !== file.content) {
+          throw new Error(`Verification failed: File ${file.path} was not written correctly to disk.`);
+        }
+      }
+      console.log('[PREVIEW-DEBUG] Verification A (file write) PASSED');
+
       // 2. Build
       const { manager: pkgManager } = await this.getPackageManager(projectPath);
-      console.log(`[PREVIEW] Building project ${projectId} with ${pkgManager}...`);
+      console.log(`[PREVIEW-DEBUG] build start: ${pkgManager} run build`);
       try {
         await this.runCommandWithOutput(pkgManager, ['run', 'build'], projectPath);
+        console.log('[PREVIEW-DEBUG] build end: success');
       } catch (err: any) {
+        console.error('[PREVIEW-DEBUG] build end: FAILED', err);
         throw new Error(`Build failed: ${err.message}`);
       }
 
+      // VERIFICATION C: Check if build produced expected output in dist/
+      // We look for a file that was changed and check its version in dist/
+      // This is a bit tricky because we don't know which files are CSS/JS,
+      // but let's check if dist/ exists and has content.
+      const distPath = path.join(projectPath, 'dist');
+      try {
+        const distFiles = await fs.readdir(distPath);
+        if (distFiles.length === 0) {
+          throw new Error('Build finished but dist/ directory is empty.');
+        }
+        console.log('[PREVIEW-DEBUG] Verification C (dist check) PASSED');
+      } catch (err: any) {
+        throw new Error(`Verification C failed: ${err.message}`);
+      }
+
       // 3. Restart Preview
-      const info = this.projects.get(projectId);
       if (info && info.port) {
+        console.log('[PREVIEW-DEBUG] restart triggered');
+        const oldPid = info.process?.pid;
+        console.log('[PREVIEW-DEBUG] restart old PID:', oldPid || 'none');
+        
         await this.restart(projectId);
+        
+        const newInfo = this.projects.get(projectId);
+        const newPid = newInfo?.process?.pid;
+        console.log('[PREVIEW-DEBUG] restart new PID:', newPid || 'none');
+        
+        if (oldPid && oldPid === newPid) {
+          console.warn('[PREVIEW-DEBUG] WARNING: Restarted process has the same PID as the old one!');
+        }
+
+        if (!newPid) {
+          throw new Error('Restart failed: New process PID not found.');
+        }
+        console.log('[PREVIEW-DEBUG] Verification D (restart) PASSED');
       }
     });
   }
