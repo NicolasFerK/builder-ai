@@ -202,11 +202,11 @@ class ProjectServerManager {
       const { stdout: ssStdout } = await execPromise(`ss -lptn 'sport = :${port}'`);
       if (!ssStdout.trim()) return false;
 
-      const lines = ssStdout.trim().split('\\n');
+      const lines = ssStdout.trim().split('\\\\n');
       let anyKilled = false;
 
       for (const line of lines) {
-        const pidMatch = line.match(/pid=(\\d+)/);
+        const pidMatch = line.match(/pid=(\\\\d+)/);
         if (!pidMatch) continue;
         const pid = parseInt(pidMatch[1], 10);
 
@@ -216,7 +216,7 @@ class ProjectServerManager {
 
         try {
           const { stdout: psStdout } = await execPromise(`ps -p ${pid} -o pgid=,args=`);
-          const parts = psStdout.trim().split(/\\s+/);
+          const parts = psStdout.trim().split(/\\\\s+/);
           if (parts.length < 2) continue;
           pgid = parseInt(parts[0], 10);
           command = parts.slice(1).join(' ');
@@ -255,8 +255,8 @@ class ProjectServerManager {
             if (shouldKillGroup) {
               try {
                 process.kill(-pgid, sig);
-              } catch (e: unknown) {
-                if (e instanceof Error && e.code !== 'ESRCH') {
+              } catch (error: unknown) {
+                if (error instanceof Error && error.code !== 'ESRCH') {
                   try { process.kill(pid, sig); } catch { /* ignore */ }
                 }
               }
@@ -489,7 +489,7 @@ class ProjectServerManager {
           `PID: ${child.pid || 'unknown'}`,
           `Server Stdout: ${info.stdout.slice(-500)}`,
           `Server Stderr: ${info.stderr.slice(-500)}`,
-        ].join('\\n');
+        ].join('\n');
         throw new Error(diagnostics);
       }
 
@@ -599,7 +599,7 @@ class ProjectServerManager {
       
       // 1. Write files
       for (const file of files) {
-        const sanitizedPath = path.normalize(file.path).replace(/^(\\\\\\.\\\\.(\\/|\\\\|$))+/, '');
+        const sanitizedPath = path.normalize(file.path).replace(/^(?:\.\.(?:[\\/]|$))+/, '');
         const filePath = path.join(projectPath, sanitizedPath);
         
         if (!filePath.startsWith(projectPath)) {
