@@ -44,6 +44,25 @@ class ProjectServerManager {
   private readonly PREVIEW_PORT = 5173;
   
   private operationLock: Promise<void> = Promise.resolve();
+  private projectQueues: Map<string, Promise<any>> = new Map();
+
+  private async runQueued<T>(projectId: string, task: () => Promise<T>): Promise<T> {
+    const currentQueue = this.projectQueues.get(projectId) || Promise.resolve();
+    
+    let resolveNext: () => void;
+    const nextQueue = new Promise<void>((resolve) => {
+      resolveNext = resolve;
+    });
+
+    this.projectQueues.set(projectId, nextQueue);
+
+    try {
+      await currentQueue;
+      return await task();
+    } finally {
+      resolveNext!();
+    }
+  }
 
   private async acquireLock<T>(task: () => Promise<T>): Promise<T> {
     const currentLock = this.operationLock;
@@ -284,7 +303,7 @@ class ProjectServerManager {
     return this.acquireLock(() => this._start(projectId));
   }
 
-  private async _start(projectId: string): Promise<ProjectInfo> {
+  private async _start(projectId: string, portOverride?: number): Promise<ProjectInfo> {
     if (this.projects.has(projectId)) {
       const existing = this.projects.get(projectId);
       if (existing && (existing.status === 'running' || existing.status === 'starting')) {
@@ -303,7 +322,7 @@ class ProjectServerManager {
     }
 
     const projectPath = path.join(this.projectsRoot, projectId);
-    const port = this.PREVIEW_PORT;
+    const port = portOverride ?? this.PREVIEW_PORT;
     const internalUrl = `http://127.0.0.1:${port}`;
     const publicUrl = await this.getPublicUrl(port);
 
@@ -557,10 +576,6 @@ class ProjectServerManager {
     await waitForGroupExit(3000);
   }
 
-  async stop(projectId: string) {
-    return this.acquireLock(() => this._stop(projectId));
-  }
-
   private async _stop(projectId: string) {
     const info = this.projects.get(projectId);
     if (!info) return;
@@ -571,8 +586,45 @@ class ProjectServerManager {
 
   async restart(projectId: string) {
     return this.acquireLock(async () => {
+      const info = this.projects.get(projectId);
+      const port = info?.port;
       await this._stop(projectId);
-      return await this._start(projectId);
+      return await this._start(projectId, port);
+    });
+  }
+
+  async applyCode(projectId: string, files: { path: string; content: string }[]): Promise<void> {
+    await this.runQueued(projectId, async () => {
+      const projectPath = path.join(this.projectsRoot, projectId);
+      
+      // 1. Write files
+      for (const file of files) {
+        const sanitizedPath = path.normalize(file.path).replace(/^(\\\\\\.\\\\.(\\/|\\\\|$))+/, '');
+        const filePath = path.join(projectPath, sanitizedPath);
+        
+        if (!filePath.startsWith(projectPath)) {
+          throw new Error(`Attempted path traversal: ${file.path}`);
+        }
+
+        const dirPath = path.dirname(filePath);
+        await fs.mkdir(dirPath, { recursive: true });
+        await fs.writeFile(filePath, file.content, 'utf-8');
+      }
+
+      // 2. Build
+      const { manager: pkgManager } = await this.getPackageManager(projectPath);
+      console.log(`[PREVIEW] Building project ${projectId} with ${pkgManager}...`);
+      try {
+        await this.runCommandWithOutput(pkgManager, ['run', 'build'], projectPath);
+      } catch (err: any) {
+        throw new Error(`Build failed: ${err.message}`);
+      }
+
+      // 3. Restart Preview
+      const info = this.projects.get(projectId);
+      if (info && info.port) {
+        await this.restart(projectId);
+      }
     });
   }
 
