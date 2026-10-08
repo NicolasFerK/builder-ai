@@ -59,6 +59,8 @@ export function parseCodeBlocks(text: string): ExtractedCode[] {
     lastIndex = codeBlockRegex.lastIndex;
   }
 
+  const extractedMap = new Map<string, ExtractedCode>();
+
   for (const block of blocks) {
     let path = '';
     let content = block.content;
@@ -96,12 +98,32 @@ export function parseCodeBlocks(text: string): ExtractedCode[] {
       continue;
     }
 
-    extracted.push({
-      path,
-      language: block.language,
-      content: content.trim()
-    });
+    const trimmedContent = content.trim();
+    const existing = extractedMap.get(path);
+
+    if (existing) {
+      // If we already have this path, we only update if the new content is not empty.
+      // This ignores empty blocks that follow non-empty ones.
+      // If an empty block was first, the non-empty one will replace it.
+      if (trimmedContent !== '') {
+        extractedMap.set(path, {
+          path,
+          language: block.language,
+          content: trimmedContent
+        });
+      }
+    } else {
+      extractedMap.set(path, {
+        path,
+        language: block.language,
+        content: trimmedContent
+      });
+    }
   }
+
+  // Clear extracted and fill from map to maintain the original return type/structure
+  extracted.length = 0;
+  extractedMap.forEach(val => extracted.push(val));
 
   console.log('[APPLY] total extracted files:', extracted.length);
   console.log('[APPLY] extracted file paths:', extracted.map(e => e.path));
