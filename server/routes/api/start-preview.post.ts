@@ -41,7 +41,7 @@ export default defineHandler(async (event) => {
       success: true,
       projectId,
       port: info.port,
-      url: info.publicUrl,
+      url: `/api/proxy/${encodeURIComponent(projectId)}/${info.port}/`,
       status: info.status,
     };
   } catch (error: unknown) {

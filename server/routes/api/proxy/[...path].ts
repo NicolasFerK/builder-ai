@@ -1,6 +1,12 @@
 import { defineHandler } from "nitro";
 import { proxyRequest, createError } from "nitro/h3";
 import { projectServerManager } from "../../../services/ProjectServerManager";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+import path from "node:path";
+
+const execAsync = promisify(exec);
+
 
 export default defineHandler(async (event) => {
   const pathParam = event.context.params?.path;
@@ -47,12 +53,34 @@ export default defineHandler(async (event) => {
   console.log(`[PROXY] Incoming request: ${event.path} -> Project: ${projectId}, Port: ${port}, Rest: ${restOfPath}`);
 
   // 1. Security Check: Validate that this port belongs to this projectId
-  const info = projectServerManager.getStatus(projectId);
-  
-  console.log(`[PROXY-DEBUG] Project info for ${projectId}:`, JSON.stringify(info, (key, value) => key === 'process' ? undefined : value));
+  let info = projectServerManager.getStatus(projectId);
 
-  if (!info || info.port !== port) {
-    console.error(`[PROXY] Unauthorized access attempt: projectId=${projectId}, requestedPort=${port}, actualPort=${info?.port}`);
+  // Recupera o registro após reinício do Nitro somente se o processo
+  // da porta estiver executando no diretório exato deste projeto.
+  if (!info) {
+    const projectPath = path.resolve(process.cwd(), "projects", projectId);
+
+    try {
+      const fs = await import("node:fs/promises");
+      const stat = await fs.stat(projectPath);
+
+      if (!stat.isDirectory()) {
+        throw new Error("O diretório do projeto não existe.");
+      }
+
+      info = await projectServerManager.start(projectId);
+
+      console.log(
+        `[PROXY] Recuperação do projeto ${projectId}: status=${info.status}, porta=${info.port}`
+      );
+    } catch (error) {
+      console.error("[PROXY] Falha ao recuperar projeto:", error);
+    }
+  
+  }
+
+  if (!info || info.port !== port || info.status === "error") {
+    console.error(`[PROXY] Acesso negado: projectId=${projectId}, requestedPort=${port}, actualPort=${info?.port}`);
     throw createError({
       statusCode: 403,
       statusMessage: "Unauthorized: Port mismatch or project not found",

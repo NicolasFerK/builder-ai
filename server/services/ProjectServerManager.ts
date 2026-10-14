@@ -299,6 +299,22 @@ class ProjectServerManager {
     }
   }
 
+  private async findExistingProjectServer(projectPath: string, port: number): Promise<boolean> {
+    try {
+      const { stdout } = await execPromise(`ss -lptn 'sport = :${port}'`);
+      const match = stdout.match(/pid=(\d+)/);
+      if (!match) return false;
+
+      const pid = Number(match[1]);
+      const { stdout: cwdOutput } = await execPromise(`readlink -f /proc/${pid}/cwd`);
+      const actualCwd = path.resolve(cwdOutput.trim());
+
+      return actualCwd === path.resolve(projectPath);
+    } catch {
+      return false;
+    }
+  }
+
   async start(projectId: string): Promise<ProjectInfo> {
     return this.acquireLock(() => this._start(projectId));
   }
@@ -325,6 +341,32 @@ class ProjectServerManager {
     const port = portOverride ?? this.PREVIEW_PORT;
     const internalUrl = `http://127.0.0.1:${port}`;
     const publicUrl = await this.getPublicUrl(port);
+
+    // Reutiliza um servidor existente deste mesmo projeto.
+    if (await this.findExistingProjectServer(projectPath, port)) {
+      const existingInfo: ProjectInfo = {
+        process: null,
+        port,
+        internalUrl,
+        publicUrl,
+        status: 'running',
+        projectPath,
+        stdout: '',
+        stderr: '',
+        npmInstallExitCode: null,
+        npmInstallError: null,
+        npmRunDevError: null,
+        processExitCode: null,
+        processSignal: null,
+        command: `existing server on port ${port}`,
+        cwd: projectPath,
+        error: null,
+      };
+
+      this.projects.set(projectId, existingInfo);
+      console.log(`[PREVIEW] Reutilizando servidor existente: ${projectId} na porta ${port}`);
+      return existingInfo;
+    }
 
     const info: ProjectInfo = {
       process: null,
