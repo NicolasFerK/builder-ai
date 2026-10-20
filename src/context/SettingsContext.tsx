@@ -15,11 +15,6 @@ const DEFAULT_SETTINGS: AISettings & { publicPreviewUrl?: string } = {
   apiUrl: '',
   theme: 'light',
   viewMode: 'desktop',
-  sshConfig: {
-    host: '',
-    port: 22,
-    user: '',
-  },
   publicPreviewUrl: undefined
 };
 
@@ -39,7 +34,6 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
             viewMode: config.aisettings?.viewMode ?? DEFAULT_SETTINGS.viewMode,
             apiKey: config.aisettings?.apiKey,
             modelName: config.aisettings?.modelName,
-            sshConfig: config.aisettings?.sshConfig ?? DEFAULT_SETTINGS.sshConfig,
             publicPreviewUrl: config.publicPreviewUrl 
           });
         }
@@ -111,8 +105,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ aisettings: { 
           apiUrl: '', 
           theme: 'light', 
-          viewMode: 'desktop',
-          sshConfig: DEFAULT_SETTINGS.sshConfig
+          viewMode: 'desktop'
         } }),
       });
     } catch (error) {

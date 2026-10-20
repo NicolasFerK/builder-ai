@@ -31,7 +31,19 @@ export class ContextManager {
       prompt += `### SESSION MEMORY\\n${project.currentSessionSummary.content}\\n\\n`;
     }
 
-    // 3. CURRENT TASK
+    // 3. REFERENCE SITE
+    if (project.referenceUrl || project.referenceSiteSummary) {
+      prompt += `### REFERENCE SITE\n`;
+      if (project.referenceUrl) {
+        prompt += `URL: ${project.referenceUrl}\n`;
+      }
+      if (project.referenceSiteSummary) {
+        prompt += `ANALYSIS: ${project.referenceSiteSummary}\n`;
+      }
+      prompt += `\n`;
+    }
+
+    // 4. CURRENT TASK
     if (project.currentTask) {
       prompt += `### CURRENT TASK\\n`;
       prompt += `TITLE: ${project.currentTask.title}\\n`;
@@ -56,7 +68,7 @@ export class ContextManager {
       }
     }
 
-    // 5. RECENT CONVERSATION
+    // 6. RECENT CONVERSATION
     const historyToUse = project.chatHistory.slice(-maxHistoryMessages);
     if (historyToUse.length > 0) {
       prompt += `### RECENT CONVERSATION\\n`;
@@ -70,8 +82,9 @@ export class ContextManager {
     prompt += `### INSTRUCTIONS\\n`;
     prompt += `1. SOURCE OF TRUTH: The current state of the files in the project is the absolute source of truth. If there is any conflict between memories (Project or Session) and the current code, the current code MUST prevail.\\n`;
     prompt += `2. USE CURRENT CONTENT: When performing tasks, always work with the most recent content of the files. Do not rely on code snippets found in the conversation history unless they are explicitly being proposed as changes.\\n`;
-    prompt += `3. ARCHITECTURE: Respect the established project architecture and patterns found in PROJECT MEMORY.\\n`;
-    prompt += `4. TASK FOCUS: Stay focused on the CURRENT TASK and its objectives.\\n`;
+    prompt += `3. REFERENCE SITE PRIORITY: If a REFERENCE SITE section is present, it is the design source of truth. Use it to guide layout, section order, hierarchy, color palette, typography, spacing, tone, imagery direction, and overall visual personality. Aim to match the reference instead of inventing a different aesthetic.\n`;
+    prompt += `4. ARCHITECTURE: Respect the established project architecture and patterns found in PROJECT MEMORY.\n`;
+    prompt += `5. TASK FOCUS: Stay focused on the CURRENT TASK and its objectives.\n`;
     prompt += `\\n`;
     prompt += `### FILE GENERATION & UPDATES\\n`;
     prompt += `When the task asks to create or modify files, the model must generate the files directly.\\n`;

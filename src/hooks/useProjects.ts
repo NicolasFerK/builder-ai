@@ -7,6 +7,11 @@ export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const extractReferenceUrl = (text: string) => {
+    const match = text.match(/https?:\/\/[^\s)\]>"]+/i);
+    return match ? match[0].replace(/[.,;!]+$/, '') : undefined;
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -25,7 +30,16 @@ export function useProjects() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newProjects));
   };
 
-  const createProject = (name: string, description: string) => {
+  const createProject = (
+    name: string,
+    description: string,
+    overrides: Partial<Pick<Project, 'referenceUrl' | 'referenceSiteSummary'>> = {}
+  ) => {
+    const referenceUrl = overrides.referenceUrl ?? extractReferenceUrl(description);
+    const projectMemory = overrides.referenceSiteSummary
+      ? `# Project Context\n\n## Project\n\nName: ${name}\n\nReference URL: ${referenceUrl || 'Not provided'}\n\nReference Site Analysis:\n${overrides.referenceSiteSummary}`
+      : `# Project Context\n\n## Project\n\nName: ${name}`;
+
     const newProject: Project = {
       id: crypto.randomUUID(),
       name,
@@ -34,7 +48,9 @@ export function useProjects() {
       lastModified: Date.now(),
       chatHistory: [{ id: crypto.randomUUID(), role: 'assistant', content: 'Hello!', timestamp: Date.now() }],
       files: [],
-      projectMemory: '# Project Context\\n\\n## Project\\n\\nName: ',
+      projectMemory,
+      referenceUrl,
+      referenceSiteSummary: overrides.referenceSiteSummary,
       sessionSummaries: [],
       currentSessionSummary: undefined,
     };

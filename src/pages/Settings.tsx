@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun, Globe, Loader2, Server, Key } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCcw, Save, Moon, Sun, Globe, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,14 +30,6 @@ const SettingsPage = () => {
     modelName: settings.modelName || '',
   });
 
-  const [sshFormData, setSshFormData] = useState({
-    host: settings.sshConfig?.host || '',
-    port: settings.sshConfig?.port || 22,
-    user: settings.sshConfig?.user || '',
-    privateKey: settings.sshConfig?.privateKey || '',
-    password: settings.sshConfig?.password || '',
-  });
-  
   const [previewUrl, setPreviewUrl] = useState(settings.publicPreviewUrl || '');
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -51,16 +43,6 @@ const SettingsPage = () => {
   }, [settings.apiUrl, settings.apiKey, settings.modelName]);
 
   useEffect(() => {
-    setSshFormData({
-      host: settings.sshConfig?.host || '',
-      port: settings.sshConfig?.port || 22,
-      user: settings.sshConfig?.user || '',
-      privateKey: settings.sshConfig?.privateKey || '',
-      password: settings.sshConfig?.password || '',
-    });
-  }, [settings.sshConfig]);
-
-  useEffect(() => {
     setPreviewUrl(settings.publicPreviewUrl || '');
   }, [settings.publicPreviewUrl]);
 
@@ -71,14 +53,7 @@ const SettingsPage = () => {
       await updateSettings({ 
         apiUrl: aiFormData.apiUrl, 
         apiKey: aiFormData.apiKey, 
-        modelName: aiFormData.modelName,
-        sshConfig: {
-          host: sshFormData.host,
-          port: Number(sshFormData.port),
-          user: sshFormData.user,
-          privateKey: sshFormData.privateKey || undefined,
-          password: sshFormData.password || undefined,
-        }
+        modelName: aiFormData.modelName
       });
       toast({
         title: "Settings saved",
@@ -159,7 +134,7 @@ const SettingsPage = () => {
       <Tabs defaultValue="appearance" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="api">API & SSH</TabsTrigger>
+          <TabsTrigger value="api">API</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
         </TabsList>
 
@@ -245,85 +220,6 @@ const SettingsPage = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="w-5 h-5 text-primary" />
-                Remote Preview (SSH)
-              </CardTitle>
-              <CardDescription>
-                Configure SSH access for remote project deployment and preview.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleAISettingsSave} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sshHost">SSH Host</Label>
-                    <Input
-                      id="sshHost"
-                      type="text"
-                      placeholder="123.456.78.90"
-                      value={sshFormData.host}
-                      onChange={(e) => setSshFormData({ ...sshFormData, host: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sshPort">SSH Port</Label>
-                    <Input
-                      id="sshPort"
-                      type="number"
-                      placeholder="22"
-                      value={sshFormData.port}
-                      onChange={(e) => setSshFormData({ ...sshFormData, port: parseInt(e.target.value) || 22 })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sshUser">SSH User</Label>
-                  <Input
-                    id="sshUser"
-                    type="text"
-                    placeholder="ubuntu"
-                    value={sshFormData.user}
-                    onChange={(e) => setSshFormData({ ...sshFormData, user: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sshPassword">SSH Password (Optional)</Label>
-                    <Input
-                      id="sshPassword"
-                      type="password"
-                      placeholder="your-password"
-                      value={sshFormData.password}
-                      onChange={(e) => setSshFormData({ ...sshFormData, password: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sshPrivateKey">SSH Private Key (Optional)</Label>
-                    <textarea
-                      id="sshPrivateKey"
-                      rows={5}
-                      className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="-----BEGIN RSA PRIVATE KEY-----..."
-                      value={sshFormData.privateKey}
-                      onChange={(e) => setSshFormData({ ...sshFormData, privateKey: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button type="submit" className="flex-1 gap-2" disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    {isSaving ? "Saving..." : "Save SSH Settings"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">

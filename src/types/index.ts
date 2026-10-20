@@ -1,11 +1,3 @@
-export type SSHConfig = {
-  host: string;
-  port: number;
-  user: string;
-  privateKey?: string;
-  password?: string;
-};
-
 export type SessionSummary = {
   id: string;
   timestamp: number;
@@ -25,6 +17,8 @@ export type Project = {
   chatHistory: ChatMessage[];
   files: FileNode[];
   projectMemory?: string;
+  referenceUrl?: string;
+  referenceSiteSummary?: string;
   sessionSummaries: SessionSummary[];
   currentSessionSummary?: SessionSummary;
   currentTask?: CurrentTask;
@@ -61,7 +55,6 @@ export type AISettings = {
   modelName?: string;
   theme?: 'light' | 'dark';
   viewMode?: 'desktop' | 'mobile';
-  sshConfig?: SSHConfig;
 };
 
 export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'failed';

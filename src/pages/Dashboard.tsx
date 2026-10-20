@@ -24,9 +24,24 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { register, handleSubmit, reset } = useForm<DashboardFormValues>();
 
-  const onSubmit = (data: DashboardFormValues) => {
+  const onSubmit = async (data: DashboardFormValues) => {
     try {
-      const newProject = createProject(data.name, data.description);
+      const referenceUrl = data.description.match(/https?:\/\/[^\s)\]>"']+/i)?.[0]?.replace(/[.,;!]+$/, '');
+      let referenceSiteSummary = '';
+
+      if (referenceUrl) {
+        const response = await fetch(`/api/reference?url=${encodeURIComponent(referenceUrl)}`);
+        if (response.ok) {
+          const payload = await response.json();
+          referenceSiteSummary = `Title: ${payload.title || 'Unknown'}\nDescription: ${payload.description || ''}\n\n${payload.content || ''}`.slice(0, 5000);
+        }
+      }
+
+      const newProject = createProject(data.name, data.description, {
+        referenceUrl,
+        referenceSiteSummary: referenceSiteSummary || undefined,
+      });
+
       toast.success('Project created successfully!');
       reset();
       navigate(`/project/${newProject.id}`);

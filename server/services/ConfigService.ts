@@ -11,11 +11,6 @@ const DEFAULT_AISettings: AISettings = {
   apiUrl: '',
   theme: 'light',
   viewMode: 'desktop',
-  sshConfig: {
-    host: '',
-    port: 22,
-    user: '',
-  },
 };
 
 const DEFAULT_CONFIG: AppConfig = {

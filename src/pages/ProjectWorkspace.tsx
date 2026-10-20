@@ -9,9 +9,8 @@ import { FileNode } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useSettings } from '@/context/SettingsContext';
-import { RefreshCcw, Download, CloudUpload, Loader2 } from 'lucide-react';
+import { RefreshCcw, Download } from 'lucide-react';
 import JSZip from 'jszip';
-import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,10 +28,7 @@ export default function ProjectWorkspace() {
   const { projectId } = useParams();
   const { projects } = useProjects();
   const { settings } = useSettings();
-  const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
-  const [isUpdatingRemote, setIsUpdatingRemote] = useState(false);
-  const [remoteStatus, setRemoteStatus] = useState<string | null>(null);
 
   const currentProject = projects.find(p => p.id === projectId);
 
@@ -43,66 +39,6 @@ export default function ProjectWorkspace() {
       </div >
     );
   }
-
-  const handleUpdateRemotePreview = async () => {
-    if (!projectId) return;
-    setIsUpdatingRemote(true);
-    setRemoteStatus('Iniciando...');
-    try {
-      const response = await fetch('/api/ssh-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.statusMessage || errorData.message || 'Failed to update remote preview.');
-      }
-
-      const { jobId } = await response.json();
-
-      // Polling for status
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusResponse = await fetch(`/api/ssh-preview/status/${jobId}`);
-          if (statusResponse.ok) {
-            const job = await statusResponse.json();
-            setRemoteStatus(job.progress);
-
-            if (job.status === 'completed') {
-              clearInterval(pollInterval);
-              setIsUpdatingRemote(false);
-              setRemoteStatus(null);
-              toast({
-                title: 'Remote Preview Updated',
-                description: 'Project files have been sent and the server is restarting.',
-              });
-            } else if (job.status === 'failed') {
-              clearInterval(pollInterval);
-              setIsUpdatingRemote(false);
-              setRemoteStatus(null);
-              throw new Error(job.error || 'Failed to update remote preview.');
-            }
-          }
-        } catch (err: any) {
-          clearInterval(pollInterval);
-          setIsUpdatingRemote(false);
-          setRemoteStatus(null);
-          throw err;
-        }
-      }, 1000);
-
-    } catch (error: any) {
-      setIsUpdatingRemote(false);
-      setRemoteStatus(null);
-      toast({
-        variant: 'destructive',
-        title: 'Remote Preview Error',
-        description: error.message,
-      });
-    }
-  };
 
   const handleExportProject = async () => {
     try {
@@ -136,8 +72,6 @@ export default function ProjectWorkspace() {
     setSelectedFile(file);
   };
 
-  const isMobileMode = settings.viewMode === 'mobile';
-
   return (
     <div className='h-screen w-full flex overflow-hidden bg-background'>
       <WorkspaceSidebar />
@@ -168,26 +102,10 @@ export default function ProjectWorkspace() {
                     </TabsTrigger>
                   </TabsList>
                   <div className='flex items-center gap-4'>
-                    {remoteStatus && (
-                      <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        {remoteStatus}
-                      </div>
-                    )}
                     <div className='text-xs text-muted-foreground'>
                       {currentProject.name}
                     </div >
                     <div className='flex items-center gap-2'>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={handleUpdateRemotePreview}
-                        disabled={isUpdatingRemote}
-                        title="Atualizar Preview Remoto"
-                      >
-                        {isUpdatingRemote ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

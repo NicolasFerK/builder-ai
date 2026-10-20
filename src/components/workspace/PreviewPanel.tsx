@@ -24,6 +24,18 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
   useEffect(() => {
     let cancelled = false;
 
+    if (settings.publicPreviewUrl) {
+      const url = settings.publicPreviewUrl.trim();
+      if (!cancelled) {
+        setPreviewUrl(url);
+        setError(null);
+        setLoading(false);
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
+
     async function startPreview() {
       setLoading(true);
       setError(null);
@@ -72,7 +84,7 @@ export function PreviewPanel({ projectId }: PreviewPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, refreshKey]);
+  }, [projectId, refreshKey, settings.publicPreviewUrl]);
 
   return (
     <div className="flex flex-col h-full bg-muted/30">
